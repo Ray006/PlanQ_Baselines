@@ -10,6 +10,8 @@ from baselines.common import set_global_seeds, tf_util
 from baselines.common.mpi_moments import mpi_moments
 import baselines.her.experiment.config as config
 from baselines.her.rollout import RolloutWorker
+from ipdb import set_trace
+from baselines.her.MB.model_based import MB_class
 
 def mpi_average(value):
     if not isinstance(value, list):
@@ -21,8 +23,9 @@ def mpi_average(value):
 
 def train(*, policy, rollout_worker, evaluator,
           n_epochs, n_test_rollouts, n_cycles, n_batches, policy_save_interval,
-          save_path, demo_file, **kwargs):
+          save_path, demo_file, dynamic_model, **kwargs):
     rank = MPI.COMM_WORLD.Get_rank()
+    MB = dynamic_model
 
     if save_path:
         latest_policy_path = os.path.join(save_path, 'policy_latest.pkl')
@@ -32,19 +35,23 @@ def train(*, policy, rollout_worker, evaluator,
     logger.info("Training...")
     best_success_rate = -1
 
+    # set_trace()
     if policy.bc_loss == 1: policy.init_demo_buffer(demo_file) #initialize demo buffer if training with demonstrations
 
     # num_timesteps = n_epochs * n_cycles * rollout_length * number of rollout workers
     for epoch in range(n_epochs):
-        # train
         rollout_worker.clear_history()
         for _ in range(n_cycles):
             episode = rollout_worker.generate_rollouts()
             policy.store_episode(episode)
+            MB.store_rollout(episode)
             for _ in range(n_batches):
-                policy.train()
+                if epoch!=0:                        
+                    policy.train(MB_dyn=MB.dyn_models)  ## if dyn model is trained, use it.
+                else:
+                    policy.train()
             policy.update_target_net()
-
+        MB.run_job()
         # test
         evaluator.clear_history()
         for _ in range(n_test_rollouts):
@@ -139,6 +146,8 @@ def learn(*, network, env, total_timesteps,
 
     dims = config.configure_dims(params)
     policy = config.configure_ddpg(dims=dims, params=params, clip_return=clip_return)
+    MB = MB_class(env=env, buffer_size=1000000, dims=dims, policy=policy)
+    
     if load_path is not None:
         tf_util.load_variables(load_path)
 
@@ -164,8 +173,8 @@ def learn(*, network, env, total_timesteps,
 
     eval_env = eval_env or env
 
-    rollout_worker = RolloutWorker(env, policy, dims, logger, monitor=True, **rollout_params)
-    evaluator = RolloutWorker(eval_env, policy, dims, logger, **eval_params)
+    rollout_worker = RolloutWorker(env, policy, dims, logger, monitor=True, mb=MB, **rollout_params)
+    evaluator = RolloutWorker(eval_env, policy, dims, logger, mb=MB, **eval_params)
 
     n_cycles = params['n_cycles']
     n_epochs = total_timesteps // n_cycles // rollout_worker.T // rollout_worker.rollout_batch_size
@@ -174,7 +183,7 @@ def learn(*, network, env, total_timesteps,
         save_path=save_path, policy=policy, rollout_worker=rollout_worker,
         evaluator=evaluator, n_epochs=n_epochs, n_test_rollouts=params['n_test_rollouts'],
         n_cycles=params['n_cycles'], n_batches=params['n_batches'],
-        policy_save_interval=policy_save_interval, demo_file=demo_file)
+        policy_save_interval=policy_save_interval, demo_file=demo_file, dynamic_model=MB)
 
 
 @click.command()

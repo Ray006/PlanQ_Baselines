@@ -11,7 +11,7 @@ class RolloutWorker:
     @store_args
     def __init__(self, venv, policy, dims, logger, T, rollout_batch_size=1,
                  exploit=False, use_target_net=False, compute_Q=False, noise_eps=0,
-                 random_eps=0, history_len=100, render=False, monitor=False, **kwargs):
+                 random_eps=0, history_len=100, render=False, monitor=False, mb = None, **kwargs):
         """Rollout worker generates experience by interacting with one or many environments.
 
         Args:
@@ -40,6 +40,7 @@ class RolloutWorker:
         self.n_episodes = 0
         self.reset_all_rollouts()
         self.clear_history()
+        self.mb = mb
 
     def reset_all_rollouts(self):
         self.obs_dict = self.venv.reset()
@@ -73,10 +74,12 @@ class RolloutWorker:
                 use_target_net=self.use_target_net)
 
             if self.compute_Q:
-                u, Q = policy_output
+                # set_trace()
+                u_Q, exp = policy_output
+                u, Q = u_Q
                 Qs.append(Q)
             else:
-                u = policy_output
+                u, exp = policy_output
 
             if u.ndim == 1:
                 # The non-batched case should still have a reasonable shape.
@@ -85,6 +88,16 @@ class RolloutWorker:
             o_new = np.empty((self.rollout_batch_size, self.dims['o']))
             ag_new = np.empty((self.rollout_batch_size, self.dims['g']))
             success = np.zeros(self.rollout_batch_size)
+
+            ##### here, use planner
+            if self.mb.model_was_learned == True and exp!=1:
+                # set_trace()
+                # if self.T-t <= self.mb.args.horizon:
+                if t >= 10:
+                    u = self.mb.planner.get_action(o, self.g, u)
+
+
+
             # compute new states and observations
             obs_dict_new, _, done, info = self.venv.step(u)
             o_new = obs_dict_new['observation']

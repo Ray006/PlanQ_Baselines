@@ -11,7 +11,7 @@ from baselines.her.normalizer import Normalizer
 from baselines.her.replay_buffer import ReplayBuffer
 from baselines.common.mpi_adam import MpiAdam
 from baselines.common import tf_util
-
+from ipdb import set_trace
 
 def dims_to_shapes(input_dims):
     return {key: tuple([val]) if val > 0 else tuple() for key, val in input_dims.items()}
@@ -105,6 +105,7 @@ class DDPG(object):
 
         global DEMO_BUFFER
         DEMO_BUFFER = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions) #initialize the demo buffer; in the same way as the primary data buffer
+        self.dyn_model = None
 
     def _random_action(self, n):
         return np.random.uniform(low=-self.max_u, high=self.max_u, size=(n, self.dimu))
@@ -146,16 +147,37 @@ class DDPG(object):
         noise = noise_eps * self.max_u * np.random.randn(*u.shape)  # gaussian noise
         u += noise
         u = np.clip(u, -self.max_u, self.max_u)
-        u += np.random.binomial(1, random_eps, u.shape[0]).reshape(-1, 1) * (self._random_action(u.shape[0]) - u)  # eps-greedy
+
+        this_step_takes_exploration = 0
+        # if np.random.binomial(1, random_eps*1.5, u.shape[0])[0] == 1:  ### exploration
+        if np.random.binomial(1, random_eps, u.shape[0])[0] == 1:  ### exploration
+            this_step_takes_exploration = 1
+            u += self._random_action(u.shape[0]) - u  # eps-greedy
+        #u += np.random.binomial(1, random_eps, u.shape[0]).reshape(-1, 1) * (self._random_action(u.shape[0]) - u)  # eps-greedy
         if u.shape[0] == 1:
             u = u[0]
         u = u.copy()
         ret[0] = u
 
         if len(ret) == 1:
-            return ret[0]
+            return ret[0], this_step_takes_exploration
         else:
-            return ret
+            return ret, this_step_takes_exploration
+
+    def get_Q_value_for_mb_only(self, o, ag, g, u, use_target_net=False):
+        o, g = self._preprocess_og(o, ag, g)
+        policy = self.target if use_target_net else self.main
+        # values to compute
+        vals = [policy.Q_pi_tf]
+        # feed
+        feed = {
+            policy.o_tf: o.reshape(-1, self.dimo),
+            policy.g_tf: g.reshape(-1, self.dimg),
+            policy.u_tf: u.reshape(-1, self.dimu)
+        }
+        Qval = self.sess.run(vals, feed_dict=feed)
+
+        return Qval
 
     def init_demo_buffer(self, demoDataFile, update_stats=True): #function that initializes the demo buffer
 
@@ -287,7 +309,9 @@ class DDPG(object):
         assert len(self.buffer_ph_tf) == len(batch)
         self.sess.run(self.stage_op, feed_dict=dict(zip(self.buffer_ph_tf, batch)))
 
-    def train(self, stage=True):
+    def train(self, stage=True, MB_dyn=None):
+        if MB_dyn!=None:
+            self.dyn_model = MB_dyn
         if stage:
             self.stage_batch()
         critic_loss, actor_loss, Q_grad, pi_grad = self._grads()
@@ -312,9 +336,22 @@ class DDPG(object):
         res = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.scope + '/' + scope)
         return res
 
+    def get_session_by_ray(config=None):
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.3)
+        config = tf.ConfigProto(
+            gpu_options=gpu_options,
+            log_device_placement=False,
+            allow_soft_placement=True,
+            inter_op_parallelism_threads=1,
+            intra_op_parallelism_threads=1)
+        sess = tf.InteractiveSession(config=config)
+        return sess
+
     def _create_network(self, reuse=False):
         logger.info("Creating a DDPG agent with action space %d x %s..." % (self.dimu, self.max_u))
-        self.sess = tf_util.get_session()
+	    #self.sess = tf_util.get_session()
+        # self.sess = tf_util.get_session_by_ray()        
+        self.sess = self.get_session_by_ray()        
 
         # running averages
         with tf.variable_scope('o_stats') as vs:

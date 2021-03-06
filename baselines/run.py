@@ -206,6 +206,16 @@ def main(args):
     args, unknown_args = arg_parser.parse_known_args(args)
     extra_args = parse_cmdline_kwargs(unknown_args)
 
+    # =========modified by ray: log path and save path =============
+    import datetime
+    import os
+    if args.log_path is not None:
+        time = datetime.datetime.now().strftime('%y_%a_%b_%d_%H:%M:%S:%f')
+        path = args.log_path
+        args.log_path = os.path.join(path, 'log_data', time)
+        args.save_path = os.path.join(path, 'policies',time)
+    # =========modified by ray: log path and save path =============
+
     if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
         rank = 0
         configure_logger(args.log_path)

@@ -17,14 +17,18 @@ from ipdb import set_trace
 
 def cost_per_step(env, pt, prev_pt, costs, goal, q_val):
     
-    # compute_reward(self, achieved_goal, goal, info)
+    available_envs={'FetchPush-v1':pt[:,3:6],'FetchSlide-v1':pt[:,3:6],'FetchPickAndPlace-v1':pt[:,3:6],  #3:6
+    'HandReach-v0':pt[:,-15:], #-15:
+    'HandManipulateBlockRotateXYZ-v0':pt[:,-7:],'HandManipulateEggFull-v0':pt[:,-7:],'HandManipulatePenRotate-v0':pt[:,-7:]}  #-7:
 
+    assert env.spec.id in available_envs.keys(),  'Oops! The environment tested is not available!'
 
-    ### assume that the reward function is known
-    new_ag = pt[:,3:6]         
-    d = np.linalg.norm(new_ag - goal, axis=-1)
-    # step_rews = -(d > 0.2).astype(np.float32)
-    step_rews = -(d > 0.05).astype(np.float32)
+    achieved_goal = available_envs[env.spec.id]
+    goal = np.tile(goal,(achieved_goal.shape[0],1))
+
+    # set_trace()
+    # assume that the reward function is known.
+    step_rews = env.envs[0].compute_reward(achieved_goal, goal, 'NoNeed')
 
     costs -= step_rews + 0.01*q_val[:,0]
     return costs

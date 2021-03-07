@@ -91,11 +91,7 @@ class RolloutWorker:
 
             ##### here, use planner
             if self.mb.model_was_learned == True and exp!=1:
-                # set_trace()
-                # if self.T-t <= self.mb.args.horizon:
-                if t >= 10:
-                    u = self.mb.planner.get_action(o, self.g, u)
-
+                u = self.mb.planner.get_action(o, self.g, u)
 
 
             # compute new states and observations

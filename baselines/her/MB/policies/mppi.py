@@ -111,21 +111,21 @@ class MPPI(object):
         costs, std_costs = calculate_costs(self.env, resulting_states_list, resulting_Q_list, goal)
 
 
-        ######### use exponential function to weight actions
-        selected_action = self.mppi_update(-costs, first_acts)
+        # ######### use exponential function to weight actions
+        # selected_action = self.mppi_update(-costs, first_acts)
         
-        # #### don't use exponential func to weight actions.
-        # if (costs == costs.min()).all():
-        #     selected_action = act_ddpg
-        #     # self.act_NN+=1
-        # else:
-        #     # self.act_plan+=1
-        #     # set_trace()
-        #     idx = np.where(costs==costs.min())[0]
-        #     # selected_action = first_acts[idx][0]
-        #     selected_action = first_acts[idx].mean(axis=0)
+        #### don't use exponential func to weight actions.
+        if (costs == costs.min()).all():
+            selected_action = act_ddpg
+            # self.act_NN+=1
+        else:
+            # self.act_plan+=1
+            # set_trace()
+            idx = np.where(costs==costs.min())[0]
+            # selected_action = first_acts[idx][0]
+            selected_action = first_acts[idx].mean(axis=0)
             
-        #     selected_action = np.tile(selected_action,(1,1))
+            selected_action = np.tile(selected_action,(1,1))
 
 
 

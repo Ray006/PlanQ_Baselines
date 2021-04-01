@@ -105,7 +105,6 @@ class DDPG(object):
 
         global DEMO_BUFFER
         DEMO_BUFFER = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions) #initialize the demo buffer; in the same way as the primary data buffer
-        self.dyn_model = None
 
     def _random_action(self, n):
         return np.random.uniform(low=-self.max_u, high=self.max_u, size=(n, self.dimu))
@@ -309,9 +308,7 @@ class DDPG(object):
         assert len(self.buffer_ph_tf) == len(batch)
         self.sess.run(self.stage_op, feed_dict=dict(zip(self.buffer_ph_tf, batch)))
 
-    def train(self, stage=True, MB_dyn=None):
-        if MB_dyn!=None:
-            self.dyn_model = MB_dyn
+    def train(self, stage=True):
         if stage:
             self.stage_batch()
         critic_loss, actor_loss, Q_grad, pi_grad = self._grads()

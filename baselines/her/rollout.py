@@ -90,9 +90,10 @@ class RolloutWorker:
             success = np.zeros(self.rollout_batch_size)
 
             ##### here, use planner
-            if self.mb.model_was_learned == True and exp!=1:
-                u = self.mb.planner.get_action(o, self.g, u)
-
+            if self.mb != None:
+                if self.mb.model_was_learned == True and exp!=1:
+                    # print("inininin")
+                    u = self.mb.planner.get_action(o, self.g, u)
 
             # compute new states and observations
             obs_dict_new, _, done, info = self.venv.step(u)

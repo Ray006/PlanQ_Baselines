@@ -39,9 +39,19 @@ DEFAULT_PARAMS = {
     # exploration
     'random_eps': 0.3,  # percentage of time a random action is taken
     'noise_eps': 0.2,  # std of gaussian noise added to not-completely-random actions as a percentage of max_u
+    
+    
     # HER
-    'replay_strategy': 'future',  # supported modes: future, none
+    # 'replay_strategy': 'future',  # supported modes: future, none
+    'replay_strategy': 'none',  # regular ddpg
     'replay_k': 4,  # number of additional goals used for replay, only used if off_policy_data=future
+    
+    # planner
+    # 'use_planner': True,
+    'use_planner': False,   
+    
+    
+    
     # normalization
     'norm_eps': 0.01,  # epsilon used for observation normalization
     'norm_clip': 5,  # normalized observations are cropped to this values
@@ -52,6 +62,7 @@ DEFAULT_PARAMS = {
     'demo_batch_size': 128, #number of samples to be used from the demonstrations buffer, per mpi thread 128/1024 or 32/256
     'prm_loss_weight': 0.001, #Weight corresponding to the primary loss
     'aux_loss_weight':  0.0078, #Weight corresponding to the auxilliary loss also called the cloning loss
+
 }
 
 
@@ -130,7 +141,6 @@ def configure_her(params):
 
     def reward_fun(ag_2, g, info):  # vectorized
         return env.compute_reward(achieved_goal=ag_2, desired_goal=g, info=info)
-
     # Prepare configuration for HER.
     her_params = {
         'reward_fun': reward_fun,

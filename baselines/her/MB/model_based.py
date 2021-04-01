@@ -65,8 +65,6 @@ class MB_class:
                     #########################
                     ##### experiment options
                     #########################
-                    'print_minimal': [False],
-
                     ## noise
                     'make_aggregated_dataset_noisy': [True],
                     'make_training_dataset_noisy': [True],
@@ -83,8 +81,6 @@ class MB_class:
                     'ensemble_size': [5],
                     'K': [1],
                     ## model training
-                    'warmstart_training': [False],
-                    'always_use_savedModel': [False],
                     'batchsize': [512],
                     'lr': [0.001],
                     'nEpoch': [30],
@@ -96,10 +92,18 @@ class MB_class:
                     'horizon': [5],
                     'num_control_samples': [500],
                     'controller_type': ['mppi'],
+
+
+
+
+                    #### exponential
+                    'use_exponential': [True],
+                    # 'use_exponential': [False],
                     ## mppi
-                    'mppi_kappa': [10],
+                    'mppi_gamma': [10000],
+                    # 'mppi_kappa': [10],
                     'mppi_mag_noise': [0.8],
-                    'mppi_beta': [0.7],
+                    # 'mppi_beta': [0.7],
                   }
         #convert job dictionary to different format
         args_list = config_dict_to_flags(para_dict)
@@ -221,81 +225,84 @@ class MB_class:
 
         return 0
 
-def main():
-
-    #####################
-    # training args
-    #####################
-
-    parser = argparse.ArgumentParser(
-        # Show default value in the help doc.
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,)
-
-    parser.add_argument(
-        '-c',
-        '--config',
-        nargs='*',
-        help=('Path to the job data config file. This is specified relative '
-            'to working directory'))
-
-    parser.add_argument(
-        '-o',
-        '--output_dir',
-        default='output',
-        help=
-        ('Directory to output trained policies, logs, and plots. A subdirectory '
-         'is created for each job. This is speficified relative to  '
-         'working directory'))
-
-    parser.add_argument('--use_gpu', action="store_true")
-    parser.add_argument('-frac', '--gpu_frac', type=float, default=0.9)
-    general_args = parser.parse_args()
-
-    #####################
-    # job configs
-    #####################
-
-    # Get the job config files
-    jobs = config_reader.process_config_files(general_args.config)
-    assert jobs, 'No jobs found from config.'
-
-    # Create the output directory if not present.
-    output_dir = general_args.output_dir
-    if not os.path.isdir(output_dir):
-        os.makedirs(output_dir)
-    output_dir = os.path.abspath(output_dir)
-
-    # Run separate experiment for each variant in the config
-    for index, job in enumerate(jobs):
-
-        #add an index to jobname, if there is more than 1 job
-        if len(jobs)>1:
-            job['job_name'] = '{}_{}'.format(job['job_name'], index)
-
-        #convert job dictionary to different format
-        args_list = config_dict_to_flags(job)
-        args = convert_to_parser_args(args_list)
-
-        #copy some general_args into args
-        args.use_gpu = general_args.use_gpu
-        args.gpu_frac = general_args.gpu_frac
-
-        #directory name for this experiment
-        job['output_dir'] = os.path.join(output_dir, job['job_name'])
-
-        ################
-        ### run job
-        ################
-
-        try:
-            run_job(args, job['output_dir'])
-        except (KeyboardInterrupt, SystemExit):
-            print('Terminating...')
-            sys.exit(0)
-        except Exception as e:
-            print('ERROR: Exception occured while running a job....')
-            traceback.print_exc()
 
 
-if __name__ == '__main__':
-    main()
+
+
+# def main():
+
+#     #####################
+#     # training args
+#     #####################
+
+#     parser = argparse.ArgumentParser(
+#         # Show default value in the help doc.
+#         formatter_class=argparse.ArgumentDefaultsHelpFormatter,)
+
+#     parser.add_argument(
+#         '-c',
+#         '--config',
+#         nargs='*',
+#         help=('Path to the job data config file. This is specified relative '
+#             'to working directory'))
+
+#     parser.add_argument(
+#         '-o',
+#         '--output_dir',
+#         default='output',
+#         help=
+#         ('Directory to output trained policies, logs, and plots. A subdirectory '
+#          'is created for each job. This is speficified relative to  '
+#          'working directory'))
+
+#     parser.add_argument('--use_gpu', action="store_true")
+#     parser.add_argument('-frac', '--gpu_frac', type=float, default=0.9)
+#     general_args = parser.parse_args()
+
+#     #####################
+#     # job configs
+#     #####################
+
+#     # Get the job config files
+#     jobs = config_reader.process_config_files(general_args.config)
+#     assert jobs, 'No jobs found from config.'
+
+#     # Create the output directory if not present.
+#     output_dir = general_args.output_dir
+#     if not os.path.isdir(output_dir):
+#         os.makedirs(output_dir)
+#     output_dir = os.path.abspath(output_dir)
+
+#     # Run separate experiment for each variant in the config
+#     for index, job in enumerate(jobs):
+
+#         #add an index to jobname, if there is more than 1 job
+#         if len(jobs)>1:
+#             job['job_name'] = '{}_{}'.format(job['job_name'], index)
+
+#         #convert job dictionary to different format
+#         args_list = config_dict_to_flags(job)
+#         args = convert_to_parser_args(args_list)
+
+#         #copy some general_args into args
+#         args.use_gpu = general_args.use_gpu
+#         args.gpu_frac = general_args.gpu_frac
+
+#         #directory name for this experiment
+#         job['output_dir'] = os.path.join(output_dir, job['job_name'])
+
+#         ################
+#         ### run job
+#         ################
+
+#         try:
+#             run_job(args, job['output_dir'])
+#         except (KeyboardInterrupt, SystemExit):
+#             print('Terminating...')
+#             sys.exit(0)
+#         except Exception as e:
+#             print('ERROR: Exception occured while running a job....')
+#             traceback.print_exc()
+
+# if __name__ == '__main__':
+#     main()

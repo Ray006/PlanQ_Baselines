@@ -40,11 +40,15 @@ class MPPI(object):
         ## init mppi vars
         #############
         self.ac_dim = ac_dim
-        self.mppi_kappa = params.mppi_kappa
+        # self.mppi_kappa = params.mppi_kappa
         self.sigma = params.mppi_mag_noise * np.ones(self.ac_dim)
-        self.beta = params.mppi_beta
+        # self.beta = params.mppi_beta
         self.env=env
         # self.mppi_mean = np.zeros((self.horizon, self.ac_dim))  #start mean at 0
+
+        self.use_exponential = params.use_exponential
+        self.gamma = params.mppi_gamma
+
 
     ###################################################################
     ###################################################################
@@ -56,7 +60,7 @@ class MPPI(object):
     def mppi_update(self, scores, all_samples):
 
         # self.gamma = 10000
-        self.gamma = 1000000
+        
         #########################
         ## how each sim's score compares to the best score
         ##########################
@@ -111,21 +115,26 @@ class MPPI(object):
         costs, std_costs = calculate_costs(self.env, resulting_states_list, resulting_Q_list, goal)
 
 
-        # ######### use exponential function to weight actions
-        # selected_action = self.mppi_update(-costs, first_acts)
+        # from ipdb import set_trace
+        # set_trace()
+
+        if self.use_exponential:
+            # ######### use exponential function to weight actions
+            selected_action = self.mppi_update(-costs, first_acts)
         
-        #### don't use exponential func to weight actions.
-        if (costs == costs.min()).all():
-            selected_action = act_ddpg
-            # self.act_NN+=1
         else:
-            # self.act_plan+=1
-            # set_trace()
-            idx = np.where(costs==costs.min())[0]
-            # selected_action = first_acts[idx][0]
-            selected_action = first_acts[idx].mean(axis=0)
-            
-            selected_action = np.tile(selected_action,(1,1))
+            #### don't use exponential func to weight actions.
+            if (costs == costs.min()).all():
+                selected_action = act_ddpg
+                # self.act_NN+=1
+            else:
+                # self.act_plan+=1
+                # set_trace()
+                idx = np.where(costs==costs.min())[0]
+                # selected_action = first_acts[idx][0]
+                selected_action = first_acts[idx].mean(axis=0)
+                
+                selected_action = np.tile(selected_action,(1,1))
 
 
 

@@ -18,8 +18,8 @@ from ipdb import set_trace
 def cost_per_step(env, pt, prev_pt, costs, goal, q_val):
     
     available_envs={'FetchPush-v1':pt[:,3:6],'FetchSlide-v1':pt[:,3:6],'FetchPickAndPlace-v1':pt[:,3:6],  #3:6
-    'HandReach-v0':pt[:,-15:], #-15:
-    'HandManipulateBlockRotateXYZ-v0':pt[:,-7:],'HandManipulateEggFull-v0':pt[:,-7:],'HandManipulatePenRotate-v0':pt[:,-7:]}  #-7:
+    # 'HandReach-v0':pt[:,-15:], #-15:
+    'HandManipulateBlockRotateXYZ-v0':pt[:,-7:],'HandManipulateEggRotate-v0':pt[:,-7:],'HandManipulatePenRotate-v0':pt[:,-7:]}  #-7:
 
     assert env.spec.id in available_envs.keys(),  'Oops! The environment tested is not available!'
 

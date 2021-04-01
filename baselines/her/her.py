@@ -23,9 +23,8 @@ def mpi_average(value):
 
 def train(*, policy, rollout_worker, evaluator,
           n_epochs, n_test_rollouts, n_cycles, n_batches, policy_save_interval,
-          save_path, demo_file, dynamic_model, **kwargs):
+          save_path, demo_file, MB, **kwargs):
     rank = MPI.COMM_WORLD.Get_rank()
-    MB = dynamic_model
 
     if save_path:
         latest_policy_path = os.path.join(save_path, 'policy_latest.pkl')
@@ -44,14 +43,13 @@ def train(*, policy, rollout_worker, evaluator,
         for _ in range(n_cycles):
             episode = rollout_worker.generate_rollouts()
             policy.store_episode(episode)
-            MB.store_rollout(episode)
+            if MB != None: MB.store_rollout(episode)
             for _ in range(n_batches):
-                if epoch!=0:                        
-                    policy.train(MB_dyn=MB.dyn_models)  ## if dyn model is trained, use it.
-                else:
-                    policy.train()
+                policy.train()
             policy.update_target_net()
-        MB.run_job()
+
+        if MB != None: MB.run_job()
+
         # test
         evaluator.clear_history()
         for _ in range(n_test_rollouts):
@@ -117,7 +115,7 @@ def learn(*, network, env, total_timesteps,
     params = config.DEFAULT_PARAMS
     env_name = env.spec.id
     params['env_name'] = env_name
-    params['replay_strategy'] = replay_strategy
+    # params['replay_strategy'] = replay_strategy
     if env_name in config.DEFAULT_ENV_PARAMS:
         params.update(config.DEFAULT_ENV_PARAMS[env_name])  # merge env-specific parameters in
     params.update(**override_params)  # makes it possible to override any parameter
@@ -146,7 +144,42 @@ def learn(*, network, env, total_timesteps,
 
     dims = config.configure_dims(params)
     policy = config.configure_ddpg(dims=dims, params=params, clip_return=clip_return)
-    MB = MB_class(env=env, buffer_size=1000000, dims=dims, policy=policy)
+
+
+    use_planner = params['use_planner']
+    if use_planner:
+        MB = MB_class(env=env, buffer_size=1000000, dims=dims, policy=policy)
+    else:
+        MB = None
+
+    # from ipdb import set_trace
+    # set_trace()
+
+
+
+    logger.warn()
+    if params['_replay_strategy'] == 'future':
+        logger.warn('replay_strategy is ' + params['_replay_strategy'] + ', use HER')
+    if params['_replay_strategy'] == 'none':
+        logger.warn('replay_strategy is ' + params['_replay_strategy'] + ', use regular DDPG')
+    logger.warn()
+    logger.warn( env_name + ': ' + env.envs[0].env.env.env.reward_type )
+    logger.warn()
+    if params['use_planner']:
+        logger.warn('Use_planner: ' + str(params['use_planner']))
+        if MB.args.use_exponential:
+            logger.warn('Use_exponential: ' + str(MB.args.use_exponential) )
+            logger.warn('mppi_gamma: ' + str(MB.args.mppi_gamma) )
+        else:
+            logger.warn('Use_exponential: ' + str(MB.args.use_exponential) )
+    else:
+        logger.warn('Use_planner: ' + str(params['use_planner']) )
+    logger.warn()
+
+    # from ipdb import set_trace
+    # set_trace()
+    
+        
 
     if load_path is not None:
         tf_util.load_variables(load_path)
@@ -183,7 +216,7 @@ def learn(*, network, env, total_timesteps,
         save_path=save_path, policy=policy, rollout_worker=rollout_worker,
         evaluator=evaluator, n_epochs=n_epochs, n_test_rollouts=params['n_test_rollouts'],
         n_cycles=params['n_cycles'], n_batches=params['n_batches'],
-        policy_save_interval=policy_save_interval, demo_file=demo_file, dynamic_model=MB)
+        policy_save_interval=policy_save_interval, demo_file=demo_file, MB=MB)
 
 
 @click.command()

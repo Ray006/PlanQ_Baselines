@@ -101,6 +101,9 @@ def convert_to_parser_args(args_source=sys.argv[1:]):
     parser.add_argument('--cem_max_iters', type=int, default=3) #number of iters
     parser.add_argument('--cem_num_elites', type=int, default=20) #elites for refitting sampling dist
 
+    # 
+    parser.add_argument('--use_exponential', action="store_true")#ray
+    parser.add_argument('--mppi_gamma', type=float, default=1000) #ray
     # mppi
     parser.add_argument('--mppi_kappa', type=float, default=1.0) #reward weighting
     parser.add_argument('--mppi_mag_noise', type=float, default=0.9) #magnitude of sampled noise

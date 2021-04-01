@@ -16,6 +16,9 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
     else:  # 'replay_strategy' == 'none'
         future_p = 0
 
+    #### regular ddpg
+    print("regular ddpg, replay_strategy is {}, future_p is {}".format(replay_strategy, future_p) )
+
     def _sample_her_transitions(episode_batch, batch_size_in_transitions):
         """episode_batch is {key: array(buffer_size x T x dim_key)}
         """

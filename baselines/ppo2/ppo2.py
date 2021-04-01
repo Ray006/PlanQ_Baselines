@@ -77,6 +77,9 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
 
     '''
 
+    # from ipdb import set_trace
+    # set_trace()
+
     set_global_seeds(seed)
 
     if isinstance(lr, float): lr = constfn(lr)
@@ -137,6 +140,9 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
         cliprangenow = cliprange(frac)
 
         if update % log_interval == 0 and is_mpi_root: logger.info('Stepping environment...')
+
+        from ipdb import set_trace
+        set_trace()
 
         # Get minibatch
         obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run() #pylint: disable=E0632

@@ -15,9 +15,40 @@
 import numpy as np
 from ipdb import set_trace
 
-def cost_per_step(env, pt, prev_pt, costs, goal, q_val):
+
+##### R+\alpha Q
+# def cost_per_step(env, pt, prev_pt, costs, goal, q_val):
     
-    available_envs={'FetchPush-v1':pt[:,3:6],'FetchSlide-v1':pt[:,3:6],'FetchPickAndPlace-v1':pt[:,3:6],  #3:6
+#     available_envs={'FetchReach-v1':pt[:,0:3], 'FetchPush-v1':pt[:,3:6],'FetchSlide-v1':pt[:,3:6],'FetchPickAndPlace-v1':pt[:,3:6],  #3:6
+#     # 'HandReach-v0':pt[:,-15:], #-15:
+#     'HandManipulateBlockRotateXYZ-v0':pt[:,-7:],'HandManipulateEggRotate-v0':pt[:,-7:],'HandManipulatePenRotate-v0':pt[:,-7:]}  #-7:
+
+#     assert env.spec.id in available_envs.keys(),  'Oops! The environment tested is not available!'
+
+#     achieved_goal = available_envs[env.spec.id]
+#     goal = np.tile(goal,(achieved_goal.shape[0],1))
+
+#     # set_trace()
+#     # assume that the reward function is known.
+#     step_rews = env.envs[0].compute_reward(achieved_goal, goal, 'NoNeed')
+
+#     costs -= step_rews + 0.01*q_val[:,0]
+    
+#     # costs -= step_rews + 0.001*q_val[:,0]
+#     # costs -= step_rews + 0.1*q_val[:,0]
+
+
+#     # costs -= step_rews
+#     # costs -= q_val[:,0]
+    
+#     return costs
+
+
+def cost_per_step(first_one, last_one, env, pt, prev_pt, costs, goal, q_val):
+    
+    gamma = 0.98
+
+    available_envs={'FetchReach-v1':pt[:,0:3], 'FetchPush-v1':pt[:,3:6],'FetchSlide-v1':pt[:,3:6],'FetchPickAndPlace-v1':pt[:,3:6],  #3:6
     # 'HandReach-v0':pt[:,-15:], #-15:
     'HandManipulateBlockRotateXYZ-v0':pt[:,-7:],'HandManipulateEggRotate-v0':pt[:,-7:],'HandManipulatePenRotate-v0':pt[:,-7:]}  #-7:
 
@@ -26,11 +57,18 @@ def cost_per_step(env, pt, prev_pt, costs, goal, q_val):
     achieved_goal = available_envs[env.spec.id]
     goal = np.tile(goal,(achieved_goal.shape[0],1))
 
-    # set_trace()
     # assume that the reward function is known.
     step_rews = env.envs[0].compute_reward(achieved_goal, goal, 'NoNeed')
 
-    costs -= step_rews + 0.01*q_val[:,0]
+    # set_trace()
+    if first_one:
+        costs -= step_rews
+    elif last_one:
+        costs -= gamma * q_val[:,0]
+    else:
+        costs -= gamma * step_rews
+
+    
     return costs
 
 def calculate_costs(env, resulting_states_list, resulting_Q_list, goal):
@@ -93,16 +131,47 @@ def calculate_costs(env, resulting_states_list, resulting_Q_list, goal):
     costs = np.zeros((N * len(resulting_states_list),))
     prev_pt = resulting_states[0]
 
+
+
+
+
     # set_trace()
+    #####test :  R+\gamma Rt+1
     #accumulate cost over each timestep
     for pt_number in range(len(resulting_states_list[0]) - 1):
+
+        first_one = False
+        last_one = False
+        if pt_number == 0:
+            first_one = True
+        if pt_number == len(resulting_states_list[0]) - 1 -1:
+            last_one = True
 
         #array of "current datapoint" [(ensemble_size*N) x state]
         pt = resulting_states[pt_number + 1]
         q_val = resulting_Q[pt_number]
-        costs = cost_per_step(env, pt, prev_pt, costs, goal, q_val)
+        costs = cost_per_step(first_one, last_one, env, pt, prev_pt, costs, goal, q_val)
         #update
         prev_pt = np.copy(pt)
+
+
+
+
+
+    # set_trace()
+    ##### R+\alpha Q
+    # #accumulate cost over each timestep
+    # for pt_number in range(len(resulting_states_list[0]) - 1):
+
+    #     #array of "current datapoint" [(ensemble_size*N) x state]
+    #     pt = resulting_states[pt_number + 1]
+    #     q_val = resulting_Q[pt_number]
+    #     costs = cost_per_step(env, pt, prev_pt, costs, goal, q_val)
+    #     #update
+    #     prev_pt = np.copy(pt)
+
+
+
 
     #consolidate costs (ensemble_size*N) --> (N)
     new_costs = []

@@ -142,6 +142,9 @@ def learn(*, network, env, total_timesteps,
         logger.warn('****************')
         logger.warn()
 
+    # from ipdb import set_trace
+    # set_trace()
+
     dims = config.configure_dims(params)
     policy = config.configure_ddpg(dims=dims, params=params, clip_return=clip_return)
 

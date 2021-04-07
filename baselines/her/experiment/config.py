@@ -42,13 +42,13 @@ DEFAULT_PARAMS = {
     
     
     # HER
-    # 'replay_strategy': 'future',  # supported modes: future, none
-    'replay_strategy': 'none',  # regular ddpg
+    'replay_strategy': 'future',  # supported modes: future, none
+    # 'replay_strategy': 'none',  # regular ddpg
     'replay_k': 4,  # number of additional goals used for replay, only used if off_policy_data=future
     
     # planner
-    # 'use_planner': True,
-    'use_planner': False,   
+    'use_planner': True,
+    # 'use_planner': False,   
     
     
     

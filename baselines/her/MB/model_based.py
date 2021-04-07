@@ -96,14 +96,11 @@ class MB_class:
 
 
 
-                    #### exponential
+                    ## mppi
                     'use_exponential': [True],
                     # 'use_exponential': [False],
-                    ## mppi
-                    'mppi_gamma': [10000],
-                    # 'mppi_kappa': [10],
+                    'mppi_gamma': [1000000],
                     'mppi_mag_noise': [0.8],
-                    # 'mppi_beta': [0.7],
                   }
         #convert job dictionary to different format
         args_list = config_dict_to_flags(para_dict)

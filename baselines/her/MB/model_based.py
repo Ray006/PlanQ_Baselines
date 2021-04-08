@@ -89,7 +89,8 @@ class MB_class:
                     ##### controller
                     ##########################
                     ## MPC
-                    'horizon': [5],
+                    # 'horizon': [5],
+                    'horizon': [7],
                     'num_control_samples': [500],
                     'controller_type': ['mppi'],
 

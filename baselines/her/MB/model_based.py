@@ -84,25 +84,42 @@ class MB_class:
                     'batchsize': [512],
                     'lr': [0.001],
                     'nEpoch': [30],
-                    'nEpoch_init': [30],
+                    # 'nEpoch': [40],
+                    # 'nEpoch_init': [30],
                     ##########################
                     ##### controller
                     ##########################
                     ## MPC
                     # 'horizon': [5],
-                    'horizon': [7],
+                    'horizon': [10],
+                    # 'horizon': [15],
                     'num_control_samples': [500],
                     'controller_type': ['mppi'],
 
-
-
-
-                    ## mppi
+                    ## exponential
                     'use_exponential': [True],
                     # 'use_exponential': [False],
-                    'mppi_gamma': [1000000],
+                    'alpha': [0.3],        ### noise factor
+                    'noise_type': ['gaussian'],
+                    # 'noise_type': ['uniform'],
+                    'beta': [1000000],        ### exponentially weighted factor, like the one mppi-kappa
+                    # 'beta': [20],        ### exponentially weighted factor, like the one mppi-kappa
+
+
+
+                    # 'mppi_only': [True],        ### use mppi planner or not
+                    'mppi_only': [False],        ### use mppi planner or not
+
+                    # 'rand_policy_sample_velocities': [True],
+                    'rand_policy_sample_velocities': [False],
+                    'mppi_kappa': [10],     ### for mppi planner
+                    # 'mppi_kappa': [50],     ### hand for mppi planner
+                    'mppi_beta': [0.6],
                     'mppi_mag_noise': [0.8],
+
                   }
+
+        self.para = para_dict
         #convert job dictionary to different format
         args_list = config_dict_to_flags(para_dict)
         self.args = convert_to_parser_args(args_list)

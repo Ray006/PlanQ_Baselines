@@ -34,27 +34,30 @@ def train(*, policy, rollout_worker, evaluator,
     logger.info("Training...")
     best_success_rate = -1
 
-    # set_trace()
     if policy.bc_loss == 1: policy.init_demo_buffer(demo_file) #initialize demo buffer if training with demonstrations
 
+    test_success_rate_for_noise_factor = 0
     # num_timesteps = n_epochs * n_cycles * rollout_length * number of rollout workers
     for epoch in range(n_epochs):
         rollout_worker.clear_history()
         for _ in range(n_cycles):
-            episode = rollout_worker.generate_rollouts()
+            episode = rollout_worker.generate_rollouts(epoch,test_success_rate_for_noise_factor)
             policy.store_episode(episode)
             if MB != None: MB.store_rollout(episode)
             for _ in range(n_batches):
                 policy.train()
             policy.update_target_net()
+            
+            # set_trace()
 
-        if MB != None: MB.run_job()
+        if (MB != None) and (not rollout_worker.abandon_planner): MB.run_job()
 
         # test
         evaluator.clear_history()
         for _ in range(n_test_rollouts):
-            evaluator.generate_rollouts()
+            evaluator.generate_rollouts(epoch,test_success_rate_for_noise_factor)
 
+        test_success_rate_for_noise_factor = evaluator.logs('test')[0][1]
         # record logs
         logger.record_tabular('epoch', epoch)
         for key, val in evaluator.logs('test'):
@@ -152,14 +155,23 @@ def learn(*, network, env, total_timesteps,
     use_planner = params['use_planner']
     if use_planner:
         MB = MB_class(env=env, buffer_size=1000000, dims=dims, policy=policy)
+        
+        for key in sorted(MB.para.keys()):
+            logger.info('{}: {}'.format(key, MB.para[key]))
     else:
         MB = None
+
+
 
     # from ipdb import set_trace
     # set_trace()
 
 
 
+    logger.warn()
+    logger.warn()
+    logger.warn()
+    logger.warn()
     logger.warn()
     if params['_replay_strategy'] == 'future':
         logger.warn('replay_strategy is ' + params['_replay_strategy'] + ', use HER')
@@ -168,13 +180,25 @@ def learn(*, network, env, total_timesteps,
     logger.warn()
     logger.warn( env_name + ': ' + env.envs[0].env.env.env.reward_type )
     logger.warn()
+
     if params['use_planner']:
         logger.warn('Use_planner: ' + str(params['use_planner']))
-        if MB.args.use_exponential:
-            logger.warn('Use_exponential: ' + str(MB.args.use_exponential) )
-            logger.warn('mppi_gamma: ' + str(MB.args.mppi_gamma) )
+        logger.warn('horizon: ' + str(MB.args.horizon))
+
+        if MB.args.mppi_only:  
+            logger.warn('Use_mppi_planner_only: ' + str(MB.args.mppi_only))
+            logger.warn('rand_policy_sample_velocities: ' + str(MB.args.rand_policy_sample_velocities))
+            logger.warn('mppi_kappa: ' + str(MB.args.mppi_kappa))
+            logger.warn('mppi_beta: ' + str(MB.args.mppi_beta))
+            logger.warn('mppi_mag_noise: ' + str(MB.args.mppi_mag_noise))
         else:
-            logger.warn('Use_exponential: ' + str(MB.args.use_exponential) )
+            if MB.args.use_exponential:
+                logger.warn('Use_exponential: ' + str(MB.args.use_exponential) )
+                logger.warn('alpha: ' + str(MB.args.alpha) )
+                logger.warn('beta: ' + str(MB.args.beta) )
+            else:
+                logger.warn('Use_exponential: ' + str(MB.args.use_exponential) )
+
     else:
         logger.warn('Use_planner: ' + str(params['use_planner']) )
     logger.warn()
@@ -189,6 +213,7 @@ def learn(*, network, env, total_timesteps,
 
     rollout_params = {
         'exploit': False,
+        # 'exploit': True,  ### no exploration for all ddpg actions
         'use_target_net': False,
         'use_demo_states': True,
         'compute_Q': False,

@@ -65,6 +65,8 @@ class DDPG(object):
         if self.clip_return is None:
             self.clip_return = np.inf
 
+        # from ipdb import set_trace
+        # set_trace()
         self.create_actor_critic = import_function(self.network_class)
 
         input_shapes = dims_to_shapes(self.input_dims)
@@ -151,7 +153,9 @@ class DDPG(object):
         # if np.random.binomial(1, random_eps*1.5, u.shape[0])[0] == 1:  ### exploration
         if np.random.binomial(1, random_eps, u.shape[0])[0] == 1:  ### exploration
             this_step_takes_exploration = 1
+            ##### no exploration now
             u += self._random_action(u.shape[0]) - u  # eps-greedy
+
         #u += np.random.binomial(1, random_eps, u.shape[0]).reshape(-1, 1) * (self._random_action(u.shape[0]) - u)  # eps-greedy
         if u.shape[0] == 1:
             u = u[0]
@@ -167,7 +171,8 @@ class DDPG(object):
         o, g = self._preprocess_og(o, ag, g)
         policy = self.target if use_target_net else self.main
         # values to compute
-        vals = [policy.Q_pi_tf]
+        # vals = [policy.Q_pi_tf]
+        vals = [policy.Q_tf]
         # feed
         feed = {
             policy.o_tf: o.reshape(-1, self.dimo),

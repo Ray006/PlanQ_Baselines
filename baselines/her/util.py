@@ -57,6 +57,9 @@ def flatten_grads(var_list, grads):
 def nn(input, layers_sizes, reuse=None, flatten=False, name=""):
     """Creates a simple neural network
     """
+    # from ipdb import set_trace
+    # set_trace()
+
     for i, size in enumerate(layers_sizes):
         activation = tf.nn.relu if i < len(layers_sizes) - 1 else None
         input = tf.layers.dense(inputs=input,

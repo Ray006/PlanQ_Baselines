@@ -90,7 +90,7 @@ def cost_per_step(t, H, env, pt, prev_pt, costs, goal, q_val):
 
     available_envs={'FetchReach-v1':pt[:,0:3], 'FetchPush-v1':pt[:,3:6],'FetchSlide-v1':pt[:,3:6],'FetchPickAndPlace-v1':pt[:,3:6],  #3:6
     # 'HandReach-v0':pt[:,-15:], #-15:
-    'HandManipulateBlockRotateXYZ-v0':pt[:,-7:],'HandManipulateEggRotate-v0':pt[:,-7:],'HandManipulatePenRotate-v0':pt[:,-7:]}  #-7:
+    'HandManipulateBlockRotateZ-v0':pt[:,-7:],'HandManipulateEggRotate-v0':pt[:,-7:],'HandManipulatePenRotate-v0':pt[:,-7:]}  #-7:
 
     assert env.spec.id in available_envs.keys(),  'Oops! The environment tested is not available!'
 
@@ -100,13 +100,30 @@ def cost_per_step(t, H, env, pt, prev_pt, costs, goal, q_val):
     # assume that the reward function is known.
     step_rews = env.envs[0].compute_reward(achieved_goal, goal, 'NoNeed')
 
-    costs -= (H-t-1) * pow(gamma,t) * step_rews + pow(gamma,t) * q_val[:,0]
+
+    # costs -= pow(gamma,t) * step_rews  ### vanilla PDDM
+
+    # costs -= (H-t-1) * pow(gamma,t) * step_rews + pow(gamma,t) * q_val[:,0]   ### ours
+    
+
+    
+    # ### test 1, each rollout step h, use only Q without r.
+    # costs -= q_val[:,0]   
+
+    # ### test 2, all rollout step, use only first step Q.
+    # if t==0:
+    #     costs -= q_val[:,0]   
+
+    ### test 3, all rollout step, use only one step Q.
+    step_h = 3 ### 2,3,4,...
+    if t==step_h:
+        costs -= q_val[:,0]   
 
     return costs
 ##############################
 ##############################
 
-def calculate_costs(env, resulting_states_list, resulting_Q_list, goal):
+def calculate_costs(env, resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions):
     """Rank various predicted trajectories (by cost)
 
     Args:
@@ -239,5 +256,17 @@ def calculate_costs(env, resulting_states_list, resulting_Q_list, goal):
     mean_cost = np.mean(new_costs, 1)
     std_cost = np.std(new_costs, 1)
 
+    #rank by rewards
+    if evaluating:
+        cost_for_ranking = mean_cost
+    #sometimes rank by model disagreement, and sometimes rank by rewards
+    else:
+        if take_exploratory_actions:
+            cost_for_ranking = mean_cost - 4 * std_cost
+            # print("   ****** taking exploratory actions for this rollout")
+        else:
+            cost_for_ranking = mean_cost
 
-    return mean_cost, std_cost
+
+    # return mean_cost, std_cost
+    return cost_for_ranking, mean_cost, std_cost

@@ -103,7 +103,11 @@ def convert_to_parser_args(args_source=sys.argv[1:]):
 
     # 
     parser.add_argument('--use_exponential', action="store_true")#ray
-    parser.add_argument('--mppi_gamma', type=float, default=1000) #ray
+    parser.add_argument('--noise_type', type=str, default='gaussian')#ray
+    parser.add_argument('--alpha', type=float, default=0.3) #ray
+    parser.add_argument('--beta', type=float, default=1000) #ray
+
+    parser.add_argument('--mppi_only', action="store_true")#ray
     # mppi
     parser.add_argument('--mppi_kappa', type=float, default=1.0) #reward weighting
     parser.add_argument('--mppi_mag_noise', type=float, default=0.9) #magnitude of sampled noise

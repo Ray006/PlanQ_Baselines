@@ -42,13 +42,16 @@ class RolloutWorker:
         self.clear_history()
         self.mb = mb
 
+        self.n_epoch = 0
+        self.abandon_planner = False
+
     def reset_all_rollouts(self):
         self.obs_dict = self.venv.reset()
         self.initial_o = self.obs_dict['observation']
         self.initial_ag = self.obs_dict['achieved_goal']
         self.g = self.obs_dict['desired_goal']
 
-    def generate_rollouts(self):
+    def generate_rollouts(self, epoch, test_success_rate_for_noise_factor):
         """Performs `rollout_batch_size` rollouts in parallel for time horizon `T` with the current
         policy acting on it accordingly.
         """
@@ -89,11 +92,58 @@ class RolloutWorker:
             ag_new = np.empty((self.rollout_batch_size, self.dims['g']))
             success = np.zeros(self.rollout_batch_size)
 
-            ##### here, use planner
-            if self.mb != None:
-                if self.mb.model_was_learned == True and exp!=1:
-                    # print("inininin")
-                    u = self.mb.planner.get_action(o, self.g, u)
+            # from ipdb import set_trace
+            # set_trace()
+
+
+
+            # ######## noise factor discount
+            # if self.n_epoch==0:
+            #     noise_factor_discount = 1
+            #     if test_success_rate_for_noise_factor>=0.9:
+            #         self.n_epoch = epoch
+            # elif (epoch - self.n_epoch) < 5:
+            #     noise_factor_discount = np.power(np.e,-(epoch - self.n_epoch))
+            #     print('start to discount the noise factor')
+            # else:
+            #     # noise_factor_discount = 0
+            #     print('no planning now')
+            #     self.abandon_planner = True
+
+            #### NO discount
+            noise_factor_discount = 1
+
+            if not self.abandon_planner:
+
+                ##### here, use planner v1
+                ### exploration by random action in ddpg
+                if self.mb != None:
+                    if self.mb.model_was_learned == True and exp!=1:
+                        # print("inininin")
+                        # u = self.mb.planner.get_action(o, self.g, u)
+                        u = self.mb.planner.get_action(o, self.g, u, evaluating=False, take_exploratory_actions=False, noise_factor_discount=noise_factor_discount)
+
+
+            # ##### here, use planner v3, No exploration
+            # if self.mb != None:
+            #     if self.mb.model_was_learned == True:
+            #         # print("inininin")
+            #         # u = self.mb.planner.get_action(o, self.g, u)
+            #         u = self.mb.planner.get_action(o, self.g, u, evaluating=False, take_exploratory_actions=False)
+            
+
+            
+            # ##### here, use planner v2 
+            # ## exploration by model-disagreement in mppi
+            # if self.mb != None:
+            #     if self.mb.model_was_learned == True:
+            #         if exp!=1:   
+            #             u = self.mb.planner.get_action(o, self.g, u, evaluating=False, take_exploratory_actions=False)
+            #         else:        ## if it's exploration, take exploration action.
+            #             u = self.mb.planner.get_action(o, self.g, u, evaluating=False, take_exploratory_actions=True)
+
+
+
 
             # compute new states and observations
             obs_dict_new, _, done, info = self.venv.step(u)

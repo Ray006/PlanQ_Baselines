@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 from baselines.her.MB.samplers import trajectory_sampler
 from baselines.her.MB.utils.helper_funcs import do_groundtruth_rollout
 from baselines.her.MB.utils.helper_funcs import turn_acs_into_acsK
-from baselines.her.MB.utils.calculate_costs import calculate_costs
+# from baselines.her.MB.utils.calculate_costs import calculate_costs
 # import pddm
 
 class RandomShooting(object):

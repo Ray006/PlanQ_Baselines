@@ -1,16 +1,3 @@
-# Copyright 2019 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 import numpy as np
 import copy
@@ -20,8 +7,6 @@ from ipdb import set_trace
 from baselines.her.MB.samplers import trajectory_sampler
 from baselines.her.MB.utils.helper_funcs import do_groundtruth_rollout
 from baselines.her.MB.utils.helper_funcs import turn_acs_into_acsK
-from baselines.her.MB.utils.calculate_costs import calculate_costs
-
 
 class MPPI(object):
 
@@ -71,45 +56,28 @@ class MPPI(object):
         if self.mppi_only:
 
             # print('use mppi planner only instead of ddpg policy')
-            #########################
-            ## how each sim's score compares to the best score
-            ##########################
             S = np.exp(self.mppi_kappa * (scores - np.max(scores)))  # [N,]
             denom = np.sum(S) + 1e-10
 
-            ##########################
-            ## weight all actions of the sequence by that sequence's resulting reward
-            ##########################
             S_shaped = np.expand_dims(np.expand_dims(S, 1), 2)  #[N,1,1]
             weighted_actions = (all_samples * S_shaped)  #[N x H x acDim]
             self.mppi_mean = np.sum(weighted_actions, 0) / denom
 
-            ##########################
-            ## return 1st element of the mean, which corresps to curr timestep
-            ##########################
             return self.mppi_mean[0]
 
         else:
             # self.gamma = 10000
             
-            #########################
-            ## how each sim's score compares to the best score
-            ##########################
             S = np.exp(self.beta * (scores - np.max(scores)))  # [N,]
             denom = np.sum(S) + 1e-10
 
             # set_trace()
-            ##########################
-            ## weight all actions of the sequence by that sequence's resulting reward
-            ##########################
             S_shaped = np.expand_dims(S, 1)  #[N,1]
             weighted_actions = (all_samples * S_shaped)  #[N x acDim]
             selected_action = np.sum(weighted_actions, 0) / denom
 
             selected_action = np.tile(selected_action,(1,1))
-            ##########################
-            ## return 1st element of the mean, which corresps to curr timestep
-            ##########################
+
             return selected_action
 
 
@@ -165,12 +133,8 @@ class MPPI(object):
             # first_acts = act_ddpg_tile + eps
 
             # set_trace()
-
             resulting_states_list, resulting_Q_list = self.dyn_models.do_forward_sim_for_mppi_only(curr_state, goal, all_acs)
-
-            # calculate costs [N,]
-            #### here, use costs only!!!
-            costs, mean_costs, std_costs = calculate_costs(self.env, resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
+            costs, mean_costs, std_costs = self.calculate_costs(self.env, resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
 
             # uses all paths to update action mean (for horizon steps)
             # Note: mppi_update needs rewards, so pass in -costs
@@ -200,17 +164,10 @@ class MPPI(object):
 
             first_acts = np.clip(first_acts, -self.max_u, self.max_u)  #### actions are \in [-1,1]
 
-            # from ipdb import set_trace
-            # set_trace()
 
-            #################################################
-            ### Get result of executing those candidate action sequences
-            #################################################
             resulting_states_list, resulting_Q_list = self.dyn_models.do_forward_sim(curr_state, goal, first_acts)
 
-            # calculate costs [N,]
-            #### here, use mean_costs only!!!
-            costs, mean_costs, std_costs = calculate_costs(self.env, resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
+            costs, mean_costs, std_costs = self.calculate_costs(self.env, resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
 
             # from ipdb import set_trace
             # set_trace()
@@ -234,3 +191,68 @@ class MPPI(object):
                     selected_action = np.tile(selected_action,(1,1))
 
             return selected_action
+
+
+
+    def reward_fun(self, env, obs, next_obs, goal):
+        available_envs={'FetchReach-v1':next_obs[:,:,0:3], 'FetchPush-v1':next_obs[:,:,3:6],'FetchSlide-v1':next_obs[:,:,3:6],'FetchPickAndPlace-v1':next_obs[:,:,3:6],  #3:6
+        # 'HandReach-v0':next_obs[:,:,-15:], #-15:
+        'HandManipulateBlockRotateZ-v0':next_obs[:,:,-7:],'HandManipulateEggRotate-v0':next_obs[:,:,-7:],'HandManipulatePenRotate-v0':next_obs[:,:,-7:]}  #-7:
+
+        assert env.spec.id in available_envs.keys(),  'Oops! The environment tested is not available!'
+
+        achieved_goal = available_envs[env.spec.id]
+        # assume that the reward function is known.
+        all_r = env.envs[0].compute_reward(achieved_goal, goal, 'NoNeed')
+
+        return all_r
+
+
+    def calculate_costs(self, env, resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions):
+    
+        H, ensemble_size, N, s_dim= np.array(resulting_states_list).shape
+        H=H-1
+
+        resulting_states=np.reshape(resulting_states_list, (H+1, ensemble_size*N, -1))
+        resulting_Q=np.reshape(resulting_Q_list, (H, ensemble_size*N, -1))
+
+        #init vars for calculating costs
+        costs = np.zeros((N * ensemble_size,))
+
+        goal = np.tile(goal,(H, ensemble_size*N,1))
+        all_r = self.reward_fun(env, resulting_states[:-1], resulting_states[1:], goal)
+
+        costs1 = np.zeros((N * ensemble_size,))
+        gamma = 0.98
+        for t in range(H):
+            
+            q_val = resulting_Q[t]
+            step_rews = all_r[t] 
+
+            # costs -= pow(gamma,t) * step_rews  ### vanilla PDDM
+            costs1 -= (H-t-1) * pow(gamma,t) * step_rews + pow(gamma,t) * q_val[:,0]   ### ours 
+
+        
+        # set_trace()
+        scores_reshape = costs.reshape(ensemble_size, N)
+        new_costs = np.swapaxes(scores_reshape, 0,1)    
+
+        #mean and std cost (across ensemble) [N,]
+        mean_cost = np.mean(new_costs, 1)
+        std_cost = np.std(new_costs, 1)
+
+
+        #rank by rewards
+        if evaluating:
+            cost_for_ranking = mean_cost
+        #sometimes rank by model disagreement, and sometimes rank by rewards
+        else:
+            if take_exploratory_actions:
+                cost_for_ranking = mean_cost - 4 * std_cost
+                # print("   ****** taking exploratory actions for this rollout")
+            else:
+                cost_for_ranking = mean_cost
+
+
+        # return mean_cost, std_cost
+        return cost_for_ranking, mean_cost, std_cost

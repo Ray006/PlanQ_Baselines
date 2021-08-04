@@ -99,7 +99,7 @@ class MB_class:
                     ## exponential
                     'use_exponential': [True],
                     # 'use_exponential': [False],
-                    'alpha': [0.3],        ### noise factor
+                    'alpha': [0.5],        ### noise factor
                     'noise_type': ['gaussian'],
                     # 'noise_type': ['uniform'],
                     'beta': [1000000],        ### exponentially weighted factor, like the one mppi-kappa

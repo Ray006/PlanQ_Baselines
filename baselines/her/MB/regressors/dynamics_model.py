@@ -294,47 +294,6 @@ class Dyn_Model:
         else:
             return (avg_loss / iters_in_batch)
 
-    #by ray
-    def do_1step_forward_sim(self, states, actions):
-
-        x=np.tile(states, (self.ensemble_size, 1, 1, 1))
-        curr_states_NK = np.swapaxes(x, 1, 2)
-
-        x=np.tile(actions, (self.ensemble_size, 1, 1, 1))
-        curr_actions_NK = np.swapaxes(x, 1, 2)       ## curr_actions_NK: [ens, N, K, aDim]
-
-        # set_trace()
-
-        #curr_states_pastTimestep: [ens, N, sDim]
-        curr_states_pastTimestep = curr_states_NK[:, :,-1, :]
-
-
-
-        #make [N x (state,action)] array to pass into NN
-        states_preprocessed = np.nan_to_num(
-            np.divide((curr_states_NK - self.normalization_data.mean_x),
-                        self.normalization_data.std_x))
-        actions_preprocessed = np.nan_to_num(
-            np.divide((curr_actions_NK - self.normalization_data.mean_y),
-                        self.normalization_data.std_y))
-        inputs_list = np.concatenate((states_preprocessed, actions_preprocessed), axis=3)
-
-        #run the N sims all at once
-        model_outputs = self.sess.run([self.predicted_outputs],
-                                    feed_dict={self.inputs_: inputs_list})
-        model_output = np.array(model_outputs[0])  #[ens, N,sDim]
-
-        state_differences = np.multiply(
-            model_output, self.normalization_data.std_z
-        ) + self.normalization_data.mean_z
-
-        #update the state info
-        curr_states_pastTimestep = curr_states_pastTimestep + state_differences
-
-
-        return curr_states_pastTimestep
-
-
 
     #############################################################
     ### perform multistep prediction
@@ -497,52 +456,103 @@ class Dyn_Model:
         state_list.append(np.copy(curr_states_pastTimestep))
         return state_list, Q_list
 
+
+
+
+
+
+
+
+
+
+    # #by ray
+    # def do_1step_forward_sim(self, states, actions):
+
+    #     x=np.tile(states, (self.ensemble_size, 1, 1, 1))
+    #     curr_states_NK = np.swapaxes(x, 1, 2)
+
+    #     x=np.tile(actions, (self.ensemble_size, 1, 1, 1))
+    #     curr_actions_NK = np.swapaxes(x, 1, 2)       ## curr_actions_NK: [ens, N, K, aDim]
+
+    #     # set_trace()
+
+    #     #curr_states_pastTimestep: [ens, N, sDim]
+    #     curr_states_pastTimestep = curr_states_NK[:, :,-1, :]
+
+
+
+    #     #make [N x (state,action)] array to pass into NN
+    #     states_preprocessed = np.nan_to_num(
+    #         np.divide((curr_states_NK - self.normalization_data.mean_x),
+    #                     self.normalization_data.std_x))
+    #     actions_preprocessed = np.nan_to_num(
+    #         np.divide((curr_actions_NK - self.normalization_data.mean_y),
+    #                     self.normalization_data.std_y))
+    #     inputs_list = np.concatenate((states_preprocessed, actions_preprocessed), axis=3)
+
+    #     #run the N sims all at once
+    #     model_outputs = self.sess.run([self.predicted_outputs],
+    #                                 feed_dict={self.inputs_: inputs_list})
+    #     model_output = np.array(model_outputs[0])  #[ens, N,sDim]
+
+    #     state_differences = np.multiply(
+    #         model_output, self.normalization_data.std_z
+    #     ) + self.normalization_data.mean_z
+
+    #     #update the state info
+    #     curr_states_pastTimestep = curr_states_pastTimestep + state_differences
+
+
+    #     return curr_states_pastTimestep
+
+
+
     #############################################################
     ### perform multistep prediction
     ### of 1 candidate action sequence
     ### as predicted by the first learned model of the ensemble
     #############################################################
 
-    def do_forward_sim_singleModel(self, states_true, actions_toPerform):
+    # def do_forward_sim_singleModel(self, states_true, actions_toPerform):
 
-        state_list = []
-        curr_state_K = np.copy(states_true[0])  #curr_state_K: [K, s_dim]
-        curr_state = curr_state_K[-1]
+    #     state_list = []
+    #     curr_state_K = np.copy(states_true[0])  #curr_state_K: [K, s_dim]
+    #     curr_state = curr_state_K[-1]
 
-        for curr_control_K in actions_toPerform:  #curr_control_K: [K, a_dim]
+    #     for curr_control_K in actions_toPerform:  #curr_control_K: [K, a_dim]
 
-            #save current state
-            state_list.append(np.copy(curr_state))  #curr_state: [s_dim, ]
+    #         #save current state
+    #         state_list.append(np.copy(curr_state))  #curr_state: [s_dim, ]
 
-            #preprocess and combine into [s,a]
-            curr_state_K_preprocessed = (
-                curr_state_K -
-                self.normalization_data.mean_x) / self.normalization_data.std_x
-            curr_control_K_preprocessed = (
-                curr_control_K -
-                self.normalization_data.mean_y) / self.normalization_data.std_y
-            inputs_K_preprocessed = np.expand_dims(
-                np.concatenate(
-                    [curr_state_K_preprocessed, curr_control_K_preprocessed],
-                    1), 0)
+    #         #preprocess and combine into [s,a]
+    #         curr_state_K_preprocessed = (
+    #             curr_state_K -
+    #             self.normalization_data.mean_x) / self.normalization_data.std_x
+    #         curr_control_K_preprocessed = (
+    #             curr_control_K -
+    #             self.normalization_data.mean_y) / self.normalization_data.std_y
+    #         inputs_K_preprocessed = np.expand_dims(
+    #             np.concatenate(
+    #                 [curr_state_K_preprocessed, curr_control_K_preprocessed],
+    #                 1), 0)
 
-            #run through NN to get prediction
-            this_dataX = np.tile(inputs_K_preprocessed, (self.ensemble_size, 1, 1, 1))
-            #### TO DO... for now, just see 1st model's prediction
-            model_outputs = self.sess.run([self.predicted_outputs], feed_dict={self.inputs_: this_dataX})
-            model_output = model_outputs[0]
+    #         #run through NN to get prediction
+    #         this_dataX = np.tile(inputs_K_preprocessed, (self.ensemble_size, 1, 1, 1))
+    #         #### TO DO... for now, just see 1st model's prediction
+    #         model_outputs = self.sess.run([self.predicted_outputs], feed_dict={self.inputs_: this_dataX})
+    #         model_output = model_outputs[0]
 
-            #multiply by std and add mean back in
-            state_differences = (
-                model_output[0][0] * self.normalization_data.std_z) + self.normalization_data.mean_z
+    #         #multiply by std and add mean back in
+    #         state_differences = (
+    #             model_output[0][0] * self.normalization_data.std_z) + self.normalization_data.mean_z
 
-            #update the state info
-            curr_state = curr_state + state_differences
+    #         #update the state info
+    #         curr_state = curr_state + state_differences
 
-            #remove current oldest element of K list (0th entry of 0th axis)
-            curr_state_K = np.delete(curr_state_K, 0, 0)
-            #add this new one to end of K list
-            curr_state_K = np.append(curr_state_K, np.expand_dims(curr_state, 0), 0)
+    #         #remove current oldest element of K list (0th entry of 0th axis)
+    #         curr_state_K = np.delete(curr_state_K, 0, 0)
+    #         #add this new one to end of K list
+    #         curr_state_K = np.append(curr_state_K, np.expand_dims(curr_state, 0), 0)
 
-        state_list.append(np.copy(curr_state))
-        return state_list
+    #     state_list.append(np.copy(curr_state))
+    #     return state_list

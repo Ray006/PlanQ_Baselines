@@ -8,14 +8,9 @@ from baselines.her.MB.samplers import trajectory_sampler
 from baselines.her.MB.utils.helper_funcs import do_groundtruth_rollout
 from baselines.her.MB.utils.helper_funcs import turn_acs_into_acsK
 
-
 class MPPI(object):
 
     def __init__(self, env, dyn_models, ac_dim, params):
-
-        ###########
-        ## params
-        ###########
         self.K = params.K
 
         self.H = params.horizon
@@ -23,11 +18,6 @@ class MPPI(object):
         self.ensemble_size = params.ensemble_size
 
         self.dyn_models = dyn_models
-        self.reward_func = None
-
-        #############
-        ## init mppi vars
-        #############
         self.ac_dim = ac_dim
         self.env=env
 
@@ -45,7 +35,6 @@ class MPPI(object):
         self.mppi_kappa = params.mppi_kappa
         
         self.max_u = 1
-
         # set_trace()
 
     ###### modified from pddm
@@ -62,10 +51,8 @@ class MPPI(object):
             self.mppi_mean = np.sum(weighted_actions, 0) / denom
 
             return self.mppi_mean[0]
-
         else:
             # self.gamma = 10000
-            
             S = np.exp(self.beta * (scores - np.max(scores)))  # [N,]
             denom = np.sum(S) + 1e-10
 
@@ -75,23 +62,17 @@ class MPPI(object):
             selected_action = np.sum(weighted_actions, 0) / denom
 
             selected_action = np.tile(selected_action,(1,1))
-
             return selected_action
-
 
     def get_action(self, curr_state, goal, act_ddpg, evaluating, take_exploratory_actions, noise_factor_discount):
 
         # set_trace()
-
         if self.mppi_only:
             past_action = self.mppi_mean[0].copy()
             self.mppi_mean[:-1] = self.mppi_mean[1:]
 
             np.random.seed()  # to get different action samples for each rollout
 
-            ##############################
-            #### get action sequences ####
-            ##############################
             #sample noise from normal dist, scaled by sigma
             if(self.sample_velocity):
                 eps_higherRange = np.random.normal( loc=0, scale=1.0, size=(self.N, self.H, self.ac_dim)) * self.sigma
@@ -106,7 +87,6 @@ class MPPI(object):
             # actions = mean + noise... then smooth the actions temporally
             all_samples = eps_mppi.copy()
             for i in range(self.H):
-
                 if(i==0):
                     all_samples[:, i, :] = self.mppi_beta*(self.mppi_mean[i, :] + eps_mppi[:, i, :]) + (1-self.mppi_beta)*past_action
                 else:
@@ -126,10 +106,7 @@ class MPPI(object):
             selected_action = self.mppi_update(-costs, all_samples)
 
             selected_action = np.tile(selected_action,(1,1))
-
-            # set_trace()
             return selected_action
-
         else:
             np.random.seed()  # to get different action samples for each rollout
         
@@ -143,20 +120,16 @@ class MPPI(object):
 
             act_ddpg_tile = np.tile(act_ddpg, (self.N, 1))
             first_acts = act_ddpg_tile + eps
-
             first_acts = np.clip(first_acts, -self.max_u, self.max_u)  #### actions are \in [-1,1]
 
             resulting_states_list, resulting_Q_list = self.dyn_models.do_forward_sim(curr_state, goal, first_acts)
-
             costs, mean_costs, std_costs = self.calculate_costs(resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
 
             # from ipdb import set_trace
             # set_trace()
 
             if self.use_exponential:
-                # ######### use exponential function to weight actions
                 selected_action = self.mppi_update(-costs, first_acts)
-            
             else:
                 #### don't use exponential func to weight actions.
                 if (costs == costs.min()).all():
@@ -170,7 +143,6 @@ class MPPI(object):
                     selected_action = first_acts[idx].mean(axis=0)
                     
                     selected_action = np.tile(selected_action,(1,1))
-
             return selected_action
 
     def reward_fun(self, obs, next_obs, goal):
@@ -190,7 +162,6 @@ class MPPI(object):
 
         resulting_states=np.reshape(resulting_states_list, (self.H+1, self.ensemble_size*self.N, -1))
         resulting_Q=np.reshape(resulting_Q_list, (self.H, self.ensemble_size*self.N, -1))
-
 
         goal = np.tile(goal,(self.H, self.ensemble_size*self.N,1))
         all_r = self.reward_fun(resulting_states[:-1], resulting_states[1:], goal)
@@ -220,12 +191,8 @@ class MPPI(object):
             cost_for_ranking = mean_cost
         #sometimes rank by model disagreement, and sometimes rank by rewards
         else:
-            if take_exploratory_actions:
-                cost_for_ranking = mean_cost - 4 * std_cost
-                # print("   ****** taking exploratory actions for this rollout")
-            else:
-                cost_for_ranking = mean_cost
-
-
+            if take_exploratory_actions:    cost_for_ranking = mean_cost - 4 * std_cost
+            else:   cost_for_ranking = mean_cost
+                
         # return mean_cost, std_cost
         return cost_for_ranking, mean_cost, std_cost

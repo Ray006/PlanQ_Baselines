@@ -103,7 +103,7 @@ def cost_per_step(t, H, env, pt, prev_pt, costs, goal, q_val):
 
     # costs -= pow(gamma,t) * step_rews  ### vanilla PDDM
 
-    # costs -= (H-t-1) * pow(gamma,t) * step_rews + pow(gamma,t) * q_val[:,0]   ### ours
+    costs -= (H-t-1) * pow(gamma,t) * step_rews + pow(gamma,t) * q_val[:,0]   ### ours
     
 
     
@@ -115,9 +115,9 @@ def cost_per_step(t, H, env, pt, prev_pt, costs, goal, q_val):
     #     costs -= q_val[:,0]   
 
     ### test 3, all rollout step, use only one step Q.
-    step_h = 3 ### 2,3,4,...
-    if t==step_h:
-        costs -= q_val[:,0]   
+    # step_h = 3 ### 2,3,4,...
+    # if t==step_h:
+    #     costs -= q_val[:,0]   
 
     return costs
 ##############################

@@ -189,17 +189,8 @@ class MPPI(object):
             return selected_action
 
 
-
         else:
-            # noise_factor = 0.2
-            # noise_factor = 0.5
-            # # remove the 1st entry of mean (mean from past timestep, that was just executed)
-            # # and copy last entry (starting point, for the next timestep)
 
-            ##############################################
-            ## sample candidate action sequences
-            ## by creating smooth filtered trajecs (noised around a mean)
-            ##############################################
             np.random.seed()  # to get different action samples for each rollout
             
             # from ipdb import set_trace

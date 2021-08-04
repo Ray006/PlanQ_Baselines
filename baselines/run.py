@@ -73,6 +73,18 @@ def train(args, extra_args):
 
     print('Training {} on {}:{} with arguments \n{}'.format(args.alg, env_type, env_id, alg_kwargs))
 
+
+    ########## added by ray , use eval env ########################
+    # from ipdb import set_trace
+    # set_trace()
+    eval_env = build_env(args)
+    if args.save_video_interval != 0:
+        eval_env = VecVideoRecorder(eval_env, osp.join(logger.get_dir(), "videos"), record_video_trigger=lambda x: x % args.save_video_interval == 0, video_length=args.save_video_length)
+    alg_kwargs['eval_env'] = eval_env
+    ########## added by ray , use eval env ########################
+
+
+
     model = learn(
         env=env,
         seed=seed,

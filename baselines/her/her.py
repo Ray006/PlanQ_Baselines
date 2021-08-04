@@ -50,6 +50,7 @@ def train(*, policy, rollout_worker, evaluator,
             
             # set_trace()
 
+            # if (MB != None) and (not rollout_worker.abandon_planner): MB.run_job()
         if (MB != None) and (not rollout_worker.abandon_planner): MB.run_job()
 
         # test
@@ -150,6 +151,10 @@ def learn(*, network, env, total_timesteps,
 
     dims = config.configure_dims(params)
     policy = config.configure_ddpg(dims=dims, params=params, clip_return=clip_return)
+
+
+
+
 
 
     use_planner = params['use_planner']

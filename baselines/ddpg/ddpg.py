@@ -13,6 +13,9 @@ import baselines.common.tf_util as U
 from baselines import logger
 import numpy as np
 
+from ipdb import set_trace
+# set_trace()
+
 try:
     from mpi4py import MPI
 except ImportError:
@@ -64,6 +67,7 @@ def learn(network, env,
     critic = Critic(network=network, **network_kwargs)
     actor = Actor(nb_actions, network=network, **network_kwargs)
 
+
     action_noise = None
     param_noise = None
     if noise_type is not None:
@@ -86,6 +90,7 @@ def learn(network, env,
     max_action = env.action_space.high
     logger.info('scaling actions by {} before executing in env'.format(max_action))
 
+    # set_trace()
     agent = DDPG(actor, critic, memory, env.observation_space.shape, env.action_space.shape,
         gamma=gamma, tau=tau, normalize_returns=normalize_returns, normalize_observations=normalize_observations,
         batch_size=batch_size, action_noise=action_noise, param_noise=param_noise, critic_l2_reg=critic_l2_reg,
@@ -104,6 +109,7 @@ def learn(network, env,
     agent.reset()
 
     obs = env.reset()
+
     if eval_env is not None:
         eval_obs = eval_env.reset()
     nenvs = obs.shape[0]
@@ -114,9 +120,6 @@ def learn(network, env,
     t = 0 # scalar
 
     epoch = 0
-
-
-
     start_time = time.time()
 
     epoch_episode_rewards = []

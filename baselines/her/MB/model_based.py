@@ -107,8 +107,8 @@ class MB_class:
 
 
 
-                    # 'mppi_only': [True],        ### use mppi planner or not
-                    'mppi_only': [False],        ### use mppi planner or not
+                    'mppi_only': [True],        ### use mppi planner or not
+                    # 'mppi_only': [False],        ### use mppi planner or not
 
                     # 'rand_policy_sample_velocities': [True],
                     'rand_policy_sample_velocities': [False],

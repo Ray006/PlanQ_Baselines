@@ -48,14 +48,6 @@ class MPPI(object):
 
         # set_trace()
 
-
-
-    ###################################################################
-    ###################################################################
-    #### update action mean using weighted average of the actions (by their resulting scores)
-    ###################################################################
-    ###################################################################
-
     ###### modified from pddm
     def mppi_update(self, scores, all_samples):
 
@@ -102,20 +94,14 @@ class MPPI(object):
             ##############################
             #sample noise from normal dist, scaled by sigma
             if(self.sample_velocity):
-                eps_higherRange = np.random.normal(
-                    loc=0, scale=1.0, size=(self.N, self.H,
-                                            self.ac_dim)) * self.sigma
+                eps_higherRange = np.random.normal( loc=0, scale=1.0, size=(self.N, self.H, self.ac_dim)) * self.sigma
                 lowerRange = 0.3*self.sigma
                 num_lowerRange = int(0.1*self.N)
-                eps_lowerRange = np.random.normal(
-                    loc=0, scale=1.0, size=(num_lowerRange, self.H,
-                                            self.ac_dim)) * lowerRange
+                eps_lowerRange = np.random.normal( loc=0, scale=1.0, size=(num_lowerRange, self.H, self.ac_dim)) * lowerRange
                 eps_higherRange[-num_lowerRange:] = eps_lowerRange
                 eps_mppi=eps_higherRange.copy()
             else:
-                eps_mppi = np.random.normal(
-                    loc=0, scale=1.0, size=(self.N, self.H,
-                                            self.ac_dim)) * self.sigma
+                eps_mppi = np.random.normal( loc=0, scale=1.0, size=(self.N, self.H, self.ac_dim)) * self.sigma
 
             # actions = mean + noise... then smooth the actions temporally
             all_samples = eps_mppi.copy()
@@ -131,16 +117,9 @@ class MPPI(object):
             all_samples = np.clip(all_samples, -1, 1)
 
             all_acs = all_samples  ### by ray
-
-
-            # noise_factor = 0.2
-            # eps = np.random.normal(loc=0, scale=1.0, size=(self.N, self.ac_dim)) * noise_factor
-            # act_ddpg_tile = np.tile(act_ddpg, (self.N, 1))
-            # first_acts = act_ddpg_tile + eps
-
             # set_trace()
             resulting_states_list, resulting_Q_list = self.dyn_models.do_forward_sim_for_mppi_only(curr_state, goal, all_acs)
-            costs, mean_costs, std_costs = self.calculate_costs(self.env, resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
+            costs, mean_costs, std_costs = self.calculate_costs(resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
 
             # uses all paths to update action mean (for H steps)
             # Note: mppi_update needs rewards, so pass in -costs
@@ -158,11 +137,8 @@ class MPPI(object):
             #     return act_ddpg
 
             if self.noise_type == 'gaussian':
-                ##### gaussian noise
-                # eps = np.random.normal(loc=0, scale=1.0, size=(self.N, self.ac_dim)) * noise_factor
                 eps = np.random.normal(loc=0, scale=1.0, size=(self.N, self.ac_dim)) * self.alpha * noise_factor_discount
             if self.noise_type == 'uniform':
-                ##### gaussian noise
                 eps = np.random.uniform(low=-self.max_u, high=self.max_u, size=(self.N, self.ac_dim)) * self.alpha * noise_factor_discount
 
             act_ddpg_tile = np.tile(act_ddpg, (self.N, 1))
@@ -170,10 +146,9 @@ class MPPI(object):
 
             first_acts = np.clip(first_acts, -self.max_u, self.max_u)  #### actions are \in [-1,1]
 
-
             resulting_states_list, resulting_Q_list = self.dyn_models.do_forward_sim(curr_state, goal, first_acts)
 
-            costs, mean_costs, std_costs = self.calculate_costs(self.env, resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
+            costs, mean_costs, std_costs = self.calculate_costs(resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
 
             # from ipdb import set_trace
             # set_trace()
@@ -198,49 +173,47 @@ class MPPI(object):
 
             return selected_action
 
-    def reward_fun(self, env, obs, next_obs, goal):
+    def reward_fun(self, obs, next_obs, goal):
         available_envs={'FetchReach-v1':next_obs[:,:,0:3], 'FetchPush-v1':next_obs[:,:,3:6],'FetchSlide-v1':next_obs[:,:,3:6],'FetchPickAndPlace-v1':next_obs[:,:,3:6],  #3:6
         # 'HandReach-v0':next_obs[:,:,-15:], #-15:
         'HandManipulateBlockRotateZ-v0':next_obs[:,:,-7:],'HandManipulateEggRotate-v0':next_obs[:,:,-7:],'HandManipulatePenRotate-v0':next_obs[:,:,-7:]}  #-7:
 
-        assert env.spec.id in available_envs.keys(),  'Oops! The environment tested is not available!'
+        assert self.env.spec.id in available_envs.keys(),  'Oops! The environment tested is not available!'
 
-        achieved_goal = available_envs[env.spec.id]
+        achieved_goal = available_envs[self.env.spec.id]
         # assume that the reward function is known.
-        all_r = env.envs[0].compute_reward(achieved_goal, goal, 'NoNeed')
+        all_r = self.env.envs[0].compute_reward(achieved_goal, goal, 'NoNeed')
 
         return all_r
 
-    def calculate_costs(self, env, resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions):
+    def calculate_costs(self, resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions):
 
         resulting_states=np.reshape(resulting_states_list, (self.H+1, self.ensemble_size*self.N, -1))
         resulting_Q=np.reshape(resulting_Q_list, (self.H, self.ensemble_size*self.N, -1))
 
-        #init vars for calculating costs
-        costs = np.zeros((self.N * self.ensemble_size,))
 
         goal = np.tile(goal,(self.H, self.ensemble_size*self.N,1))
-        all_r = self.reward_fun(env, resulting_states[:-1], resulting_states[1:], goal)
+        all_r = self.reward_fun(resulting_states[:-1], resulting_states[1:], goal)
 
-        costs1 = np.zeros((self.N * self.ensemble_size,))
+        costs = np.zeros((self.N * self.ensemble_size,))
         gamma = 0.98
+
         for t in range(self.H):
-            
             q_val = resulting_Q[t]
             step_rews = all_r[t] 
 
             # costs -= pow(gamma,t) * step_rews  ### vanilla PDDM
-            costs1 -= (self.H-t-1) * pow(gamma,t) * step_rews + pow(gamma,t) * q_val[:,0]   ### ours 
+            costs -= (self.H-t-1) * pow(gamma,t) * step_rews + pow(gamma,t) * q_val[:,0]   ### ours 
 
-        
-        # set_trace()
+        # set_trace() 
+        # costs1
+
         scores_reshape = costs.reshape(self.ensemble_size, self.N)
         new_costs = np.swapaxes(scores_reshape, 0,1)    
 
         #mean and std cost (across ensemble) [N,]
         mean_cost = np.mean(new_costs, 1)
         std_cost = np.std(new_costs, 1)
-
 
         #rank by rewards
         if evaluating:

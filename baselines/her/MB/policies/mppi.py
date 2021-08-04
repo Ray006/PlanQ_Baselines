@@ -167,12 +167,6 @@ class MPPI(object):
             # set_trace()
 
             resulting_states_list, resulting_Q_list = self.dyn_models.do_forward_sim_for_mppi_only(curr_state, goal, all_acs)
-            resulting_states_list = np.swapaxes(resulting_states_list, 0,1)  #[ensSize, horizon+1, N, statesize]
-            resulting_Q_list = np.swapaxes(resulting_Q_list, 0,1)  #[ensSize, horizon+1, N, statesize]
-
-            ############################
-            ### evaluate the predicted trajectories
-            ############################
 
             # calculate costs [N,]
             #### here, use costs only!!!
@@ -185,17 +179,11 @@ class MPPI(object):
             selected_action = np.tile(selected_action,(1,1))
 
             # set_trace()
-
             return selected_action
 
-
         else:
-
             np.random.seed()  # to get different action samples for each rollout
-            
-            # from ipdb import set_trace
-            # set_trace()
-
+        
             # if noise_factor_discount==0:
             #     return act_ddpg
 
@@ -211,6 +199,7 @@ class MPPI(object):
             first_acts = act_ddpg_tile + eps
 
             first_acts = np.clip(first_acts, -self.max_u, self.max_u)  #### actions are \in [-1,1]
+
             # from ipdb import set_trace
             # set_trace()
 
@@ -218,17 +207,10 @@ class MPPI(object):
             ### Get result of executing those candidate action sequences
             #################################################
             resulting_states_list, resulting_Q_list = self.dyn_models.do_forward_sim(curr_state, goal, first_acts)
-            resulting_states_list = np.swapaxes(resulting_states_list, 0,1)  #[ensSize, horizon+1, N, statesize]
-            resulting_Q_list = np.swapaxes(resulting_Q_list, 0,1)  #[ensSize, horizon+1, N, statesize]
-
-            ############################
-            ### evaluate the predicted trajectories
-            ############################
 
             # calculate costs [N,]
             #### here, use mean_costs only!!!
             costs, mean_costs, std_costs = calculate_costs(self.env, resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
-
 
             # from ipdb import set_trace
             # set_trace()

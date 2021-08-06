@@ -53,16 +53,17 @@ class Dyn_Model:
         self.K = self.params.K
         self.tf_datatype = self.params.tf_datatype
 
+        self.mppi_only = params.mppi_only
+        self.H = self.params.horizon
+        self.N = self.params.num_control_samples
+
         self.scope = 'dynamics_model'
-        # g_mb = tf.Graph()
-        # with g_mb.as_default():
-        # set_trace()
+        
         with tf.variable_scope(self.scope):
 
             ## create placeholders
             self.create_placeholders()
             ## clip actions
-            # because MPPI sometimes tries to predict outcome
             # of acs outside of range -1 to 1
             first, second = tf.split(self.inputs_, [(inputSize - self.acSize), self.acSize], 3)
             second = tf.clip_by_value(second, -1, 1)
@@ -80,16 +81,8 @@ class Dyn_Model:
 
 
     def create_placeholders(self):
-
-        self.inputs_ = tf.placeholder(
-            self.tf_datatype,
-            shape=[self.ensemble_size, None, self.K, self.inputSize],
-            name='nn_inputs')
-
-        self.labels_ = tf.placeholder(
-            self.tf_datatype,
-            shape=[None, self.outputSize],
-            name='nn_labels')
+        self.inputs_ = tf.placeholder( self.tf_datatype, shape=[self.ensemble_size, None, self.K, self.inputSize], name='nn_inputs')
+        self.labels_ = tf.placeholder( self.tf_datatype, shape=[None, self.outputSize], name='nn_labels')
 
 
     def define_forward_pass(self):
@@ -294,127 +287,41 @@ class Dyn_Model:
         else:
             return (avg_loss / iters_in_batch)
 
-
-    #############################################################
-    ### perform multistep prediction
-    ### of N different candidate action sequences
-    ### as predicted by the ensemble of learned models
-    #############################################################
-
-    #by ray
-    #forward-simulate multiple different action sequences at once
-    def do_forward_sim_for_mppi_only(self, states, goal, all_acs):
-
-        state_list = []
-        Q_list = []
-        horizon = self.params.horizon
-        N = self.params.num_control_samples
-
-        # set_trace()
-
-        # curr_states_NK = np.swapaxes(states_true, 0, 1)
-        #curr_states_NK: [ens, N, K, sDim]
-        curr_states_NK = np.tile(states, (self.ensemble_size, N, 1, 1))
-        goal_tile = np.tile(goal, (self.ensemble_size, N, 1, 1))
-
-        # actions_toPerform = np.tile(actions, (self.ensemble_size, 1, 1, 1))
-        # curr_actions_NK = np.swapaxes(actions_toPerform, 1, 2)
-        
-        actions_toPerform = np.tile(all_acs, (self.ensemble_size, 1, 1, 1))
-        curr_actions_NK = actions_toPerform[:,:,0:1,:]
-
-        # self.get_ddpg_act()
-        # set_trace()
-        # Q = self.getQval(o=curr_states_NK, ag='no need', g=goal_tile, u=curr_actions_NK)
-
-        Q = self.getQval(o=curr_states_NK, ag='no need', g=goal_tile, u=curr_actions_NK)
-        curr_Q_NK = Q[0].reshape(self.ensemble_size, N, 1, 1)
-
-        #advance all N sims, one timestep at a time
-        for timestep in range(horizon):
-
-            if timestep != 0:
-                # set_trace()
-                # ddpg_output_Q, _= self.get_ddpg_act(o=curr_states_NK, ag='no need', g=goal_tile, compute_Q=True)
-                # ddpg_output, Q = ddpg_output_Q
-                # curr_actions_NK = ddpg_output.reshape(curr_actions_NK.shape)
-                # curr_Q_NK = Q.reshape(self.ensemble_size, N, 1, 1)
-
-                curr_actions_NK = actions_toPerform[:, :, timestep:timestep+1, :]
-                Q = self.getQval(o=curr_states_NK, ag='no need', g=goal_tile, u=curr_actions_NK)
-                curr_Q_NK = Q[0].reshape(self.ensemble_size, N, 1, 1)
-
-            #curr_states_pastTimestep: [ens, N, sDim]
-            curr_states_pastTimestep = curr_states_NK[:, :,-1, :]
-            curr_Q_pastTimestep = curr_Q_NK[:, :,-1, :]
-
-            #keep track of states for all N sims
-            state_list.append(np.copy(curr_states_pastTimestep))
-            Q_list.append(np.copy(curr_Q_pastTimestep))
-
-            #make [N x (state,action)] array to pass into NN
-            states_preprocessed = np.nan_to_num(
-                np.divide((curr_states_NK - self.normalization_data.mean_x),
-                          self.normalization_data.std_x))
-            actions_preprocessed = np.nan_to_num(
-                np.divide((curr_actions_NK - self.normalization_data.mean_y),
-                          self.normalization_data.std_y))
-            inputs_list = np.concatenate((states_preprocessed, actions_preprocessed), axis=3)
-
-            #run the N sims all at once
-            model_outputs = self.sess.run([self.predicted_outputs],
-                                        feed_dict={self.inputs_: inputs_list})
-            model_output = np.array(model_outputs[0])  #[ens, N,sDim]
-
-            state_differences = np.multiply(
-                model_output, self.normalization_data.std_z
-            ) + self.normalization_data.mean_z
-
-            #update the state info
-            curr_states_pastTimestep = curr_states_pastTimestep + state_differences
-
-            #remove current oldest element of K list (0th entry of 1st axis)
-            curr_states_NK = np.delete(curr_states_NK, 0, 2)  #[ens,N,K,sDim] --> [ens,N,K-1,sDim]
-
-            #add this new one to end of K list
-            newentry = np.expand_dims(curr_states_pastTimestep, 2)  #[ens,N,sDim] --> [ens,N,1,sDim]
-            curr_states_NK = np.append(curr_states_NK, newentry, 2)  #[ens,N,K-1,sDim]+[ens,N,1,sDim] = [ens,N,K,sDim]
-
-        #return a list of length = horizon+1... each one has N entries, where each entry is (sDim,)
-        state_list.append(np.copy(curr_states_pastTimestep))
-        return state_list, Q_list
-
     def do_forward_sim(self, states, goal, actions):
 
         state_list = []
         Q_list = []
-        horizon = self.params.horizon
-        N = self.params.num_control_samples
 
         # set_trace()
+        if self.mppi_only:
+            actions_toPerform = np.tile(all_acs, (self.ensemble_size, 1, 1, 1))
+            curr_actions_NK = actions_toPerform[:,:,0:1,:]
 
-        # curr_states_NK = np.swapaxes(states_true, 0, 1)
-        #curr_states_NK: [ens, N, K, sDim]
-        curr_states_NK = np.tile(states, (self.ensemble_size, N, 1, 1))
-        goal_tile = np.tile(goal, (self.ensemble_size, N, 1, 1))
+        else:            
+            goal_tile = np.tile(goal, (self.ensemble_size, self.N, 1, 1))
+            actions_toPerform = np.tile(actions, (self.ensemble_size, 1, 1, 1))
+            curr_actions_NK = np.swapaxes(actions_toPerform, 1, 2)
 
-        actions_toPerform = np.tile(actions, (self.ensemble_size, 1, 1, 1))
-        curr_actions_NK = np.swapaxes(actions_toPerform, 1, 2)
-        
-        # self.get_ddpg_act()
-        # set_trace()
+        curr_states_NK = np.tile(states, (self.ensemble_size, self.N, 1, 1))
         Q = self.getQval(o=curr_states_NK, ag='no need', g=goal_tile, u=curr_actions_NK)
-        curr_Q_NK = Q[0].reshape(self.ensemble_size, N, 1, 1)
+        curr_Q_NK = Q[0].reshape(self.ensemble_size, self.N, 1, 1)
+
 
         #advance all N sims, one timestep at a time
-        for timestep in range(horizon):
+        for timestep in range(self.H):
 
             if timestep != 0:
                 # set_trace()
-                ddpg_output_Q, _= self.get_ddpg_act(o=curr_states_NK, ag='no need', g=goal_tile, compute_Q=True)
-                ddpg_output, Q = ddpg_output_Q
-                curr_actions_NK = ddpg_output.reshape(curr_actions_NK.shape)
-                curr_Q_NK = Q.reshape(self.ensemble_size, N, 1, 1)
+
+                if self.mppi_only:                
+                    curr_actions_NK = actions_toPerform[:, :, timestep:timestep+1, :]
+                    Q = self.getQval(o=curr_states_NK, ag='no need', g=goal_tile, u=curr_actions_NK)
+                    curr_Q_NK = Q[0].reshape(self.ensemble_size, self.N, 1, 1)                    
+                else:                    
+                    ddpg_output_Q, _= self.get_ddpg_act(o=curr_states_NK, ag='no need', g=goal_tile, compute_Q=True)
+                    ddpg_output, Q = ddpg_output_Q
+                    curr_actions_NK = ddpg_output.reshape(curr_actions_NK.shape)
+                    curr_Q_NK = Q.reshape(self.ensemble_size, self.N, 1, 1)
 
             #curr_states_pastTimestep: [ens, N, sDim]
             curr_states_pastTimestep = curr_states_NK[:, :,-1, :]
@@ -456,103 +363,3 @@ class Dyn_Model:
         state_list.append(np.copy(curr_states_pastTimestep))
         return state_list, Q_list
 
-
-
-
-
-
-
-
-
-
-    # #by ray
-    # def do_1step_forward_sim(self, states, actions):
-
-    #     x=np.tile(states, (self.ensemble_size, 1, 1, 1))
-    #     curr_states_NK = np.swapaxes(x, 1, 2)
-
-    #     x=np.tile(actions, (self.ensemble_size, 1, 1, 1))
-    #     curr_actions_NK = np.swapaxes(x, 1, 2)       ## curr_actions_NK: [ens, N, K, aDim]
-
-    #     # set_trace()
-
-    #     #curr_states_pastTimestep: [ens, N, sDim]
-    #     curr_states_pastTimestep = curr_states_NK[:, :,-1, :]
-
-
-
-    #     #make [N x (state,action)] array to pass into NN
-    #     states_preprocessed = np.nan_to_num(
-    #         np.divide((curr_states_NK - self.normalization_data.mean_x),
-    #                     self.normalization_data.std_x))
-    #     actions_preprocessed = np.nan_to_num(
-    #         np.divide((curr_actions_NK - self.normalization_data.mean_y),
-    #                     self.normalization_data.std_y))
-    #     inputs_list = np.concatenate((states_preprocessed, actions_preprocessed), axis=3)
-
-    #     #run the N sims all at once
-    #     model_outputs = self.sess.run([self.predicted_outputs],
-    #                                 feed_dict={self.inputs_: inputs_list})
-    #     model_output = np.array(model_outputs[0])  #[ens, N,sDim]
-
-    #     state_differences = np.multiply(
-    #         model_output, self.normalization_data.std_z
-    #     ) + self.normalization_data.mean_z
-
-    #     #update the state info
-    #     curr_states_pastTimestep = curr_states_pastTimestep + state_differences
-
-
-    #     return curr_states_pastTimestep
-
-
-
-    #############################################################
-    ### perform multistep prediction
-    ### of 1 candidate action sequence
-    ### as predicted by the first learned model of the ensemble
-    #############################################################
-
-    # def do_forward_sim_singleModel(self, states_true, actions_toPerform):
-
-    #     state_list = []
-    #     curr_state_K = np.copy(states_true[0])  #curr_state_K: [K, s_dim]
-    #     curr_state = curr_state_K[-1]
-
-    #     for curr_control_K in actions_toPerform:  #curr_control_K: [K, a_dim]
-
-    #         #save current state
-    #         state_list.append(np.copy(curr_state))  #curr_state: [s_dim, ]
-
-    #         #preprocess and combine into [s,a]
-    #         curr_state_K_preprocessed = (
-    #             curr_state_K -
-    #             self.normalization_data.mean_x) / self.normalization_data.std_x
-    #         curr_control_K_preprocessed = (
-    #             curr_control_K -
-    #             self.normalization_data.mean_y) / self.normalization_data.std_y
-    #         inputs_K_preprocessed = np.expand_dims(
-    #             np.concatenate(
-    #                 [curr_state_K_preprocessed, curr_control_K_preprocessed],
-    #                 1), 0)
-
-    #         #run through NN to get prediction
-    #         this_dataX = np.tile(inputs_K_preprocessed, (self.ensemble_size, 1, 1, 1))
-    #         #### TO DO... for now, just see 1st model's prediction
-    #         model_outputs = self.sess.run([self.predicted_outputs], feed_dict={self.inputs_: this_dataX})
-    #         model_output = model_outputs[0]
-
-    #         #multiply by std and add mean back in
-    #         state_differences = (
-    #             model_output[0][0] * self.normalization_data.std_z) + self.normalization_data.mean_z
-
-    #         #update the state info
-    #         curr_state = curr_state + state_differences
-
-    #         #remove current oldest element of K list (0th entry of 0th axis)
-    #         curr_state_K = np.delete(curr_state_K, 0, 0)
-    #         #add this new one to end of K list
-    #         curr_state_K = np.append(curr_state_K, np.expand_dims(curr_state, 0), 0)
-
-    #     state_list.append(np.copy(curr_state))
-    #     return state_list

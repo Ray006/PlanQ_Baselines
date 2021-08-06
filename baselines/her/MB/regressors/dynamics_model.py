@@ -294,15 +294,16 @@ class Dyn_Model:
 
         # set_trace()
         if self.mppi_only:
-            actions_toPerform = np.tile(all_acs, (self.ensemble_size, 1, 1, 1))
+            actions_toPerform = np.tile(actions, (self.ensemble_size, 1, 1, 1))
             curr_actions_NK = actions_toPerform[:,:,0:1,:]
 
         else:            
-            goal_tile = np.tile(goal, (self.ensemble_size, self.N, 1, 1))
             actions_toPerform = np.tile(actions, (self.ensemble_size, 1, 1, 1))
             curr_actions_NK = np.swapaxes(actions_toPerform, 1, 2)
 
+        goal_tile = np.tile(goal, (self.ensemble_size, self.N, 1, 1))
         curr_states_NK = np.tile(states, (self.ensemble_size, self.N, 1, 1))
+        
         Q = self.getQval(o=curr_states_NK, ag='no need', g=goal_tile, u=curr_actions_NK)
         curr_Q_NK = Q[0].reshape(self.ensemble_size, self.N, 1, 1)
 

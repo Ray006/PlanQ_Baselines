@@ -98,7 +98,7 @@ class MPPI(object):
 
             all_acs = all_samples  ### by ray
             # set_trace()
-            resulting_states_list, resulting_Q_list = self.dyn_models.do_forward_sim_for_mppi_only(curr_state, goal, all_acs)
+            resulting_states_list, resulting_Q_list = self.dyn_models.do_forward_sim(curr_state, goal, all_acs)
             costs, mean_costs, std_costs = self.calculate_costs(resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
 
             # uses all paths to update action mean (for H steps)

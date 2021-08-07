@@ -363,7 +363,6 @@ class Dyn_Model:
         def rollout_loop_body(t, xxx_todo_changeme):
             (obs, act, obs_ta, act_ta) = xxx_todo_changeme
             
-
             next_obs = self.transition_planQ(obs, act)
             if self.mppi_only:
                 next_act = tf.tile( self.actions[t+1:t+2], (self.ensemble_size, 1, 1))

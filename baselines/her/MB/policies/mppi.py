@@ -99,11 +99,8 @@ class MPPI(object):
 
             all_acs = all_samples  ### by ray
             # set_trace()
-            t2 = time.time()
             resulting_states_list, resulting_Q_list = self.dyn_models.do_forward_sim(curr_state, goal, all_acs)
-            t3 = time.time()
             costs, mean_costs, std_costs = self.calculate_costs(resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
-            t4 = time.time()
 
             # uses all paths to update action mean (for H steps)
             # Note: mppi_update needs rewards, so pass in -costs
@@ -111,11 +108,7 @@ class MPPI(object):
 
             selected_action = np.tile(selected_action,(1,1))
 
-            print("t1-t2: {:0.4f} s".format(t2 - t1))
-            print("t2-t3: {:0.4f} s".format(t3 - t2))
-            print("t3-t4: {:0.4f} s".format(t4 - t3))
-            # print("t4-t: {:0.4f} s".format(time.time() - t4))
-            print("total time *******: {:0.4f} s".format(time.time() - t1))
+            # print("total time *******: {:0.4f} s".format(time.time() - t1))
 
             return selected_action
         else:
@@ -134,11 +127,8 @@ class MPPI(object):
             first_acts = act_ddpg_tile + eps
             first_acts = np.clip(first_acts, -self.max_u, self.max_u)  #### actions are \in [-1,1]
 
-            t2 = time.time()
             resulting_states_list, resulting_Q_list = self.dyn_models.do_forward_sim(curr_state, goal, first_acts)
-            t3 = time.time()
             costs, mean_costs, std_costs = self.calculate_costs(resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
-            t4 = time.time()
 
             # from ipdb import set_trace
             # set_trace()
@@ -158,12 +148,8 @@ class MPPI(object):
                     selected_action = first_acts[idx].mean(axis=0)
                     
                     selected_action = np.tile(selected_action,(1,1))
-            
-            print("t1-t2: {:0.4f} s".format(t2 - t1))
-            print("t2-t3: {:0.4f} s".format(t3 - t2))
-            print("t3-t4: {:0.4f} s".format(t4 - t3))
-            # print("t4-t: {:0.4f} s".format(time.time() - t4))
-            print("total time *******: {:0.4f} s".format(time.time() - t1))
+
+            # print("total time *******: {:0.4f} s".format(time.time() - t1))
 
             return selected_action
 

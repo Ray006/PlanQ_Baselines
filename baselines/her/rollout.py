@@ -124,27 +124,6 @@ class RolloutWorker:
                         u = self.mb.planner.get_action(o, self.g, u, evaluating=False, take_exploratory_actions=False, noise_factor_discount=noise_factor_discount)
 
 
-            # ##### here, use planner v3, No exploration
-            # if self.mb != None:
-            #     if self.mb.model_was_learned == True:
-            #         # print("inininin")
-            #         # u = self.mb.planner.get_action(o, self.g, u)
-            #         u = self.mb.planner.get_action(o, self.g, u, evaluating=False, take_exploratory_actions=False)
-            
-
-            
-            # ##### here, use planner v2 
-            # ## exploration by model-disagreement in mppi
-            # if self.mb != None:
-            #     if self.mb.model_was_learned == True:
-            #         if exp!=1:   
-            #             u = self.mb.planner.get_action(o, self.g, u, evaluating=False, take_exploratory_actions=False)
-            #         else:        ## if it's exploration, take exploration action.
-            #             u = self.mb.planner.get_action(o, self.g, u, evaluating=False, take_exploratory_actions=True)
-
-
-
-
             # compute new states and observations
             obs_dict_new, _, done, info = self.venv.step(u)
             o_new = obs_dict_new['observation']

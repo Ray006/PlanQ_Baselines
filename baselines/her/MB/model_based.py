@@ -16,7 +16,6 @@ import traceback
 from ipdb import set_trace
 # set_trace()
 
-
 #my imports
 from baselines.her.MB.policies.policy_random import Policy_Random
 from baselines.her.MB.utils.helper_funcs import *
@@ -41,69 +40,36 @@ class MB_class:
         # self.num_data = 0
 
         para_dict={
-                    'use_gpu': [1],
-                    # 'use_gpu': [0],
-                    'gpu_frac': [0.5],
-                    #########################
-                    ##### run options
-                    #########################
-                    'job_name': ['ant'],
                     'seed': [0],
-                    #########################
-                    ##### experiment options
-                    #########################
-                    ## noise
-                    'make_aggregated_dataset_noisy': [True],
-                    'make_training_dataset_noisy': [True],
-                    'rollouts_noise_actions': [False],
-                    'rollouts_document_noised_actions': [False],
-
-                    ##########################
-                    ##### dynamics model
-                    ##########################
-                    ## arch
                     'num_fc_layers': [2],
                     'depth_fc_layers': [400],
-                    # 'ensemble_size': [3],
                     'ensemble_size': [5],
                     'K': [1],
-                    ## model training
                     'batchsize': [512],
                     'lr': [0.001],
                     'nEpoch': [30],
-                    # 'nEpoch': [40],
-                    # 'nEpoch_init': [30],
+
                     ##########################
                     ##### controller
                     ##########################
-                    ## MPC
-                    # 'horizon': [5],
                     'horizon': [10],
-                    # 'horizon': [15],
                     'num_control_samples': [500],
-                    'controller_type': ['mppi'],
+                    'alpha': [0.5],        ### noise factor
 
-                    ## exponential
                     'use_exponential': [True],
                     # 'use_exponential': [False],
-                    'alpha': [0.5],        ### noise factor
                     'noise_type': ['gaussian'],
                     # 'noise_type': ['uniform'],
                     'beta': [1000000],        ### exponentially weighted factor, like the one mppi-kappa
                     # 'beta': [20],        ### exponentially weighted factor, like the one mppi-kappa
 
-
-
-                    'mppi_only': [True],        ### use mppi planner or not
-                    # 'mppi_only': [False],        ### use mppi planner or not
-
-                    # 'rand_policy_sample_velocities': [True],
+                    # 'mppi_only': [True],        ### use mppi planner or not
+                    'mppi_only': [False],        ### use mppi planner or not
                     'rand_policy_sample_velocities': [False],
                     'mppi_kappa': [10],     ### for mppi planner
                     # 'mppi_kappa': [50],     ### hand for mppi planner
                     'mppi_beta': [0.6],
                     'mppi_mag_noise': [0.8],
-
                   }
         
         para_dict['s_dim'] = [dims['o']]
@@ -113,7 +79,6 @@ class MB_class:
         #convert job dictionary to different format
         args_list = config_dict_to_flags(para_dict)
         self.args = convert_to_parser_args(args_list)
-
 
 
         ### set seeds
@@ -126,11 +91,6 @@ class MB_class:
         self.args.noiseToSignal = 0.01
         #initialize data processor
         self.data_processor = DataProcessor(self.args)
-        # #initialize saver
-        # saver = Saver(save_dir, sess)
-        # saver_data = DataPerIter()
-
-        # self.sess = tf.Session(config=get_gpu_config(self.args.use_gpu, self.args.gpu_frac))
         
         ### init model
         s_dim, a_dim = dims['o'], dims['u']
@@ -198,13 +158,6 @@ class MB_class:
         inputs_onPol, outputs_onPol = self.data_processor.xyz_to_inpOutp(preprocessed_data_trainOnPol)
         inputs_val_onPol, outputs_val_onPol = self.data_processor.xyz_to_inpOutp(preprocessed_data_valOnPol)
 
-        # set_trace()
-        # tf.reset_default_graph()  #### ????   
-        # with tf.Session(config=get_gpu_config(self.args.use_gpu, self.args.gpu_frac)) as sess:
-
-        # #re-initialize all vars (randomly) if training from scratch
-        # self.sess.run(tf.global_variables_initializer())
-
         ## train model
         training_loss, training_lists_to_save = self.dyn_models.train(
             inputs_onPol,
@@ -213,101 +166,4 @@ class MB_class:
             inputs_val_onPol=inputs_val_onPol,
             outputs_val_onPol=outputs_val_onPol)
 
-            # #########################################################
-            # ### save everything about this iter of model training
-            # #########################################################
-            # trainingLoss_perIter.append(training_loss)
-
-            # saver_data.training_losses = trainingLoss_perIter
-            # saver_data.training_lists_to_save = training_lists_to_save
-
-            # saver_data.train_rollouts_onPol = rollouts_trainOnPol
-            # saver_data.val_rollouts_onPol = rollouts_valOnPol
-
-            # ### save all info from this training iteration
-            # saver.save_model()
-            # saver.save_training_info(saver_data)
-
         return 0
-
-
-
-
-
-# def main():
-
-#     #####################
-#     # training args
-#     #####################
-
-#     parser = argparse.ArgumentParser(
-#         # Show default value in the help doc.
-#         formatter_class=argparse.ArgumentDefaultsHelpFormatter,)
-
-#     parser.add_argument(
-#         '-c',
-#         '--config',
-#         nargs='*',
-#         help=('Path to the job data config file. This is specified relative '
-#             'to working directory'))
-
-#     parser.add_argument(
-#         '-o',
-#         '--output_dir',
-#         default='output',
-#         help=
-#         ('Directory to output trained policies, logs, and plots. A subdirectory '
-#          'is created for each job. This is speficified relative to  '
-#          'working directory'))
-
-#     parser.add_argument('--use_gpu', action="store_true")
-#     parser.add_argument('-frac', '--gpu_frac', type=float, default=0.9)
-#     general_args = parser.parse_args()
-
-#     #####################
-#     # job configs
-#     #####################
-
-#     # Get the job config files
-#     jobs = config_reader.process_config_files(general_args.config)
-#     assert jobs, 'No jobs found from config.'
-
-#     # Create the output directory if not present.
-#     output_dir = general_args.output_dir
-#     if not os.path.isdir(output_dir):
-#         os.makedirs(output_dir)
-#     output_dir = os.path.abspath(output_dir)
-
-#     # Run separate experiment for each variant in the config
-#     for index, job in enumerate(jobs):
-
-#         #add an index to jobname, if there is more than 1 job
-#         if len(jobs)>1:
-#             job['job_name'] = '{}_{}'.format(job['job_name'], index)
-
-#         #convert job dictionary to different format
-#         args_list = config_dict_to_flags(job)
-#         args = convert_to_parser_args(args_list)
-
-#         #copy some general_args into args
-#         args.use_gpu = general_args.use_gpu
-#         args.gpu_frac = general_args.gpu_frac
-
-#         #directory name for this experiment
-#         job['output_dir'] = os.path.join(output_dir, job['job_name'])
-
-#         ################
-#         ### run job
-#         ################
-
-#         try:
-#             run_job(args, job['output_dir'])
-#         except (KeyboardInterrupt, SystemExit):
-#             print('Terminating...')
-#             sys.exit(0)
-#         except Exception as e:
-#             print('ERROR: Exception occured while running a job....')
-#             traceback.print_exc()
-
-# if __name__ == '__main__':
-#     main()

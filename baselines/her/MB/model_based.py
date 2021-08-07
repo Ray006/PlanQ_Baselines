@@ -94,8 +94,8 @@ class MB_class:
 
 
 
-                    'mppi_only': [True],        ### use mppi planner or not
-                    # 'mppi_only': [False],        ### use mppi planner or not
+                    # 'mppi_only': [True],        ### use mppi planner or not
+                    'mppi_only': [False],        ### use mppi planner or not
 
                     # 'rand_policy_sample_velocities': [True],
                     'rand_policy_sample_velocities': [False],
@@ -105,6 +105,9 @@ class MB_class:
                     'mppi_mag_noise': [0.8],
 
                   }
+        
+        para_dict['s_dim'] = [dims['o']]
+        para_dict['a_dim'] = [dims['u']]
 
         self.para = para_dict
         #convert job dictionary to different format

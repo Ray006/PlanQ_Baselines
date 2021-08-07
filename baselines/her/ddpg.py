@@ -183,6 +183,61 @@ class DDPG(object):
 
         return Qval
 
+
+
+    def main_network_reuse(self, o, g, u=None):
+
+
+        o_shape = o.get_shape().as_list()
+        # dim = o.shape.dims[0].value
+
+        # o, g = self._preprocess_og(o, ag, g)
+        o = tf.clip_by_value(o, -self.clip_obs, self.clip_obs)
+        g = tf.clip_by_value(g, -self.clip_obs, self.clip_obs)   
+
+
+        o = tf.reshape(o, [-1, self.dimo])
+        g = tf.reshape(g, [-1, self.dimg])
+
+        if u is None:   #### get action, no need u
+            action = tf.zeros([o.shape[0],self.dimu])
+        else:           #### get Q value, need u
+            action = tf.reshape(u, [-1, self.dimu])
+    
+        # set_trace()
+
+        #### two ways
+        # batch_tf = OrderedDict([ (key, val) for key, val in zip(['o', 'g', 'u'], [o, g, action]) ])
+        batch_tf = dict(list(zip(['o', 'g', 'u'], [o, g, action])))
+
+        with tf.variable_scope('ddpg'):
+            with tf.variable_scope('main', reuse=tf.AUTO_REUSE):
+                # set_trace()
+                main_reuse = self.create_actor_critic(batch_tf, net_type='main', **self.__dict__)
+
+        # set_trace()
+
+        if u is None:   #### get action, no need u
+            u_shape = o_shape
+            u_shape[-1] = self.dimu
+
+            action = main_reuse.pi_tf
+            action = tf.reshape(action, u_shape)
+            return action
+        else:           #### get Q value, need u
+            q_shape = o_shape
+            q_shape[-1] = 1
+        
+            q_value = main_reuse.Q_tf
+            q_value = tf.reshape(q_value, q_shape)
+            return q_value
+
+
+
+
+
+
+
     def init_demo_buffer(self, demoDataFile, update_stats=True): #function that initializes the demo buffer
 
         demoData = np.load(demoDataFile) #load the demonstration data from data file

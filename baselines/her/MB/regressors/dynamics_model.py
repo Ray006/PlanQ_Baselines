@@ -45,6 +45,8 @@ class Dyn_Model:
         self.get_ddpg_act = policy.get_actions
         self.getQval = policy.get_Q_value_for_mb_only
 
+        self.main_network_reuse = policy.main_network_reuse 
+
         # params
         self.params = params
         self.ensemble_size = self.params.ensemble_size
@@ -56,6 +58,7 @@ class Dyn_Model:
         self.mppi_only = params.mppi_only
         self.H = self.params.horizon
         self.N = self.params.num_control_samples
+
 
         self.scope = 'dynamics_model'
         
@@ -71,7 +74,9 @@ class Dyn_Model:
 
             ## define forward pass
             self.define_forward_pass()
-        
+
+        self.graph_do_forward_sim()
+
         mb_var = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.scope)
         tf.variables_initializer(mb_var).run()
 
@@ -288,70 +293,215 @@ class Dyn_Model:
             return (avg_loss / iters_in_batch)
 
 
-    ##### v2
-    def do_forward_sim(self, states, goal, actions):
+    # ##### v2
+    # def do_forward_sim(self, states, goal, actions):
 
-        state_list = []
-        Q_list = []
+    #     state_list = []
+    #     Q_list = []
+
+    #     # set_trace()
+    #     if self.mppi_only:
+    #         actions_toPerform = np.tile(actions, (self.ensemble_size, 1, 1, 1))
+    #         curr_actions_NK = actions_toPerform[:,:,0,:]
+
+    #     else:            
+    #         actions_toPerform = np.tile(actions, (self.ensemble_size, 1, 1))
+    #         curr_actions_NK = actions_toPerform
+
+    #     goal_tile = np.tile(goal, (self.ensemble_size, self.N, 1))
+    #     curr_states_NK = np.tile(states, (self.ensemble_size, self.N, 1))
+        
+    #     Q = self.getQval(o=curr_states_NK, ag='no need', g=goal_tile, u=curr_actions_NK)
+    #     curr_Q_NK = Q[0].reshape(self.ensemble_size, self.N, 1)
+
+
+    #     #advance all N sims, one timestep at a time
+    #     for timestep in range(self.H):
+
+    #         if timestep != 0:
+    #             # set_trace()
+
+    #             if self.mppi_only:                
+    #                 curr_actions_NK = actions_toPerform[:, :, timestep, :]
+    #                 Q = self.getQval(o=curr_states_NK, ag='no need', g=goal_tile, u=curr_actions_NK)
+    #                 curr_Q_NK = Q[0].reshape(self.ensemble_size, self.N, 1)                    
+    #             else:                    
+    #                 ddpg_output_Q, _= self.get_ddpg_act(o=curr_states_NK, ag='no need', g=goal_tile, compute_Q=True)
+    #                 ddpg_output, Q = ddpg_output_Q
+    #                 curr_actions_NK = ddpg_output.reshape(curr_actions_NK.shape)
+    #                 curr_Q_NK = Q.reshape(self.ensemble_size, self.N, 1)
+
+    #         # set_trace()
+    #         curr_Q_pastTimestep = curr_Q_NK
+
+    #         #keep track of states for all N sims
+    #         state_list.append(np.copy(curr_states_NK))
+    #         Q_list.append(np.copy(curr_Q_pastTimestep))
+
+    #         #make [N x (state,action)] array to pass into NN
+    #         states_preprocessed = np.nan_to_num( np.divide((curr_states_NK - self.normalization_data.mean_x), self.normalization_data.std_x))
+    #         actions_preprocessed = np.nan_to_num( np.divide((curr_actions_NK - self.normalization_data.mean_y), self.normalization_data.std_y))
+    #         inputs_list = np.concatenate((states_preprocessed, actions_preprocessed), axis=-1)
+            
+    #         inputs_list = np.expand_dims(inputs_list,2) ### for keeping K in place_holder
+    #         # set_trace()
+
+    #         model_outputs = self.sess.run([self.predicted_outputs], feed_dict={self.inputs_: inputs_list})
+    #         model_output = np.array(model_outputs[0])  #[ens, N,sDim]
+    #         state_differences = np.multiply( model_output, self.normalization_data.std_z ) + self.normalization_data.mean_z
+
+    #         #update the state info
+    #         curr_states_NK = curr_states_NK + state_differences
+
+    #     #return a list of length = horizon+1... each one has N entries, where each entry is (sDim,)
+    #     state_list.append(np.copy(curr_states_NK))
+    #     return state_list, Q_list
+
+
+
+
+
+
+    def clip_actions(self, input_data):
+        ## clip actions to range -1 to 1
+        first, second = tf.split(input_data, [(self.inputSize - self.acSize), self.acSize], -1)
+        second = tf.clip_by_value(second, -1, 1)
+        inputs_clipped = tf.concat([first, second], axis=-1)   
+        return inputs_clipped  
+
+    # #by ray
+    def transition_planQ(self, obs, act):
+
+        states_preprocessed  = tf.divide((obs  - self.ph_mean_curr_s), self.ph_std_curr_s)
+        actions_preprocessed = tf.divide((act  - self.ph_mean_curr_a), self.ph_std_curr_a)
+        inputs_list = tf.concat((states_preprocessed, actions_preprocessed), axis=-1)
+        inputs_clipped_planQ = self.clip_actions(inputs_list)   #### in cpu version, there is no clip here.
+
+        nn_outputs_planQ = []
+        with tf.variable_scope(self.scope, reuse=True):        
+            for i in range(self.ensemble_size):
+                # set_trace()
+                this_output_planQ = feedforward_network( inputs_clipped_planQ[i], self.inputSize, self.outputSize,
+                                                self.params.num_fc_layers, self.params.depth_fc_layers, self.tf_datatype, scope=i)
+                nn_outputs_planQ.append(this_output_planQ)
+        state_differences = tf.multiply( nn_outputs_planQ, self.ph_std_diff_s ) + self.ph_mean_diff_s
+        next_states_NK = obs + state_differences
+
+        return next_states_NK
+
+    def graph_do_forward_sim(self):
+        '''  current state and action placeholders '''
+        self.inputs_curr_s = tf.placeholder( self.tf_datatype, shape=[1, self.params.s_dim], name='curr_s')
+        self.inputs_goal = tf.placeholder( self.tf_datatype, shape=[1, 3], name='goal')
+        if self.mppi_only:
+            self.inputs_curr_a = tf.placeholder( self.tf_datatype, shape=[self.N, self.H, self.params.a_dim], name='curr_a')
+        else:
+            self.inputs_curr_a = tf.placeholder( self.tf_datatype, shape=[self.N, self.params.a_dim], name='curr_a')
+
+
+        '''  mean and std placeholders '''
+        self.ph_mean_curr_s = tf.placeholder( self.tf_datatype, shape=[self.params.s_dim], name='m_curr_s')
+        self.ph_mean_diff_s = tf.placeholder( self.tf_datatype, shape=[self.params.s_dim], name='m_diff_s')
+        self.ph_mean_curr_a = tf.placeholder( self.tf_datatype, shape=[self.params.a_dim], name='m_curr_a')
+        self.ph_std_curr_s = tf.placeholder( self.tf_datatype, shape=[self.params.s_dim], name='std_curr_s')
+        self.ph_std_diff_s = tf.placeholder( self.tf_datatype, shape=[self.params.s_dim], name='std_diff_s')
+        self.ph_std_curr_a = tf.placeholder( self.tf_datatype, shape=[self.params.a_dim], name='std_curr_a')
+        '''  all placeholders '''
+        ph_input = [self.inputs_curr_s, self.inputs_goal, self.inputs_curr_a]  
+        ph_norm = [self.ph_mean_curr_s, self.ph_mean_curr_a, self.ph_mean_diff_s, self.ph_std_curr_s, self.ph_std_curr_a, self.ph_std_diff_s]  
+        self.all_ph_graph = ph_input + ph_norm
 
         # set_trace()
-        if self.mppi_only:
-            actions_toPerform = np.tile(actions, (self.ensemble_size, 1, 1, 1))
-            curr_actions_NK = actions_toPerform[:,:,0,:]
-
-        else:            
-            actions_toPerform = np.tile(actions, (self.ensemble_size, 1, 1))
-            curr_actions_NK = actions_toPerform
-
-        goal_tile = np.tile(goal, (self.ensemble_size, self.N, 1))
-        curr_states_NK = np.tile(states, (self.ensemble_size, self.N, 1))
+        ''' tile state and action -->[ensemble_size, N, a_dim]'''
+        obs_N = tf.tile( tf.reshape(self.inputs_curr_s, [1,1,-1]), (self.ensemble_size, self.N, 1))
+        self.goal_N = tf.tile( tf.reshape(self.inputs_goal, [1,1,-1]), (self.ensemble_size, self.N, 1))
         
-        Q = self.getQval(o=curr_states_NK, ag='no need', g=goal_tile, u=curr_actions_NK)
-        curr_Q_NK = Q[0].reshape(self.ensemble_size, self.N, 1)
+        if self.mppi_only:
+            self.actions = tf.transpose(self.inputs_curr_a,(1,0,2))
+            self.actions = tf.concat([self.actions, self.actions[0:1]],0)  #### the while_loop "needs" the one more action
+            act_N = tf.tile( self.actions[0:1], (self.ensemble_size, 1, 1))
+        else:
+            act_N = tf.tile( tf.reshape(self.inputs_curr_a, [1,self.N,-1]), (self.ensemble_size, 1, 1))
 
-
-        #advance all N sims, one timestep at a time
-        for timestep in range(self.H):
-
-            if timestep != 0:
-                # set_trace()
-
-                if self.mppi_only:                
-                    curr_actions_NK = actions_toPerform[:, :, timestep, :]
-                    Q = self.getQval(o=curr_states_NK, ag='no need', g=goal_tile, u=curr_actions_NK)
-                    curr_Q_NK = Q[0].reshape(self.ensemble_size, self.N, 1)                    
-                else:                    
-                    ddpg_output_Q, _= self.get_ddpg_act(o=curr_states_NK, ag='no need', g=goal_tile, compute_Q=True)
-                    ddpg_output, Q = ddpg_output_Q
-                    curr_actions_NK = ddpg_output.reshape(curr_actions_NK.shape)
-                    curr_Q_NK = Q.reshape(self.ensemble_size, self.N, 1)
-
+        
             # set_trace()
-            curr_Q_pastTimestep = curr_Q_NK
 
-            #keep track of states for all N sims
-            state_list.append(np.copy(curr_states_NK))
-            Q_list.append(np.copy(curr_Q_pastTimestep))
-
-            #make [N x (state,action)] array to pass into NN
-            states_preprocessed = np.nan_to_num( np.divide((curr_states_NK - self.normalization_data.mean_x), self.normalization_data.std_x))
-            actions_preprocessed = np.nan_to_num( np.divide((curr_actions_NK - self.normalization_data.mean_y), self.normalization_data.std_y))
-            inputs_list = np.concatenate((states_preprocessed, actions_preprocessed), axis=-1)
+        ''' do H steps rollouts '''
+        obs_ta =  tf.TensorArray(size=self.H, dynamic_size=False, dtype=tf.float32)
+        act_ta =  tf.TensorArray(size=self.H, dynamic_size=False, dtype=tf.float32)
+        def rollout_loop_body(t, xxx_todo_changeme):
+            (obs, act, obs_ta, act_ta) = xxx_todo_changeme
             
-            inputs_list = np.expand_dims(inputs_list,2) ### for keeping K in place_holder
-            # set_trace()
 
-            model_outputs = self.sess.run([self.predicted_outputs], feed_dict={self.inputs_: inputs_list})
-            model_output = np.array(model_outputs[0])  #[ens, N,sDim]
-            state_differences = np.multiply( model_output, self.normalization_data.std_z ) + self.normalization_data.mean_z
+            next_obs = self.transition_planQ(obs, act)
+            if self.mppi_only:
+                next_act = tf.tile( self.actions[t+1:t+2], (self.ensemble_size, 1, 1))
+                # next_act = tf.tile( self.actions[t:t+1  ], (self.ensemble_size, 1, 1))
+                next_act = tf.reshape(next_act,[self.ensemble_size, self.N, self.params.a_dim])
+            else:
+                next_act = self.main_network_reuse(next_obs, self.goal_N)
 
-            #update the state info
-            curr_states_NK = curr_states_NK + state_differences
+            obs_ta = obs_ta.write(t, obs)
+            act_ta = act_ta.write(t, act)
+            return t+1, (next_obs, next_act, obs_ta, act_ta)
 
-        #return a list of length = horizon+1... each one has N entries, where each entry is (sDim,)
-        state_list.append(np.copy(curr_states_NK))
-        return state_list, Q_list
+        _, (final_obs, final_act, obs_ta, act_ta) = tf.while_loop(
+            lambda t, _: t < self.H,
+            rollout_loop_body,
+            [0, (obs_N, act_N, obs_ta, act_ta)]
+        )
+        ### compile the TensorArrays into useful tensors
+        obss = obs_ta.stack()
+        final_obs = tf.reshape(final_obs, [1, self.ensemble_size, self.N, self.params.s_dim])
+        all_obss = tf.concat([obss, final_obs],0)
+        all_acts = act_ta.stack()
+        
+        ''' reshape the state list and action list for calculating reward, q-value, and done '''
+        all_obs = tf.reshape(all_obss, (self.H+1, self.ensemble_size * self.N, self.params.s_dim)) ## [H+1, ensSize, N, statesize] -> [H+1, ensSize * N, statesize]
+        all_act = tf.reshape(all_acts, (self.H,   self.ensemble_size * self.N, self.params.a_dim)) ## [H, ensSize, N, asize] -> [H, ensSize * N, asize]
 
+        all_goal= tf.tile( tf.reshape(self.inputs_goal, [1,1,-1]), (self.H, self.ensemble_size*self.N, 1))
+
+        self.s_list = all_obs
+        self.curr_s_list = all_obs[:-1]
+        self.next_s_list = all_obs[1: ]
+        self.curr_a_list = all_act
+        # set_trace()
+
+        self.Q_values = self.main_network_reuse(self.curr_s_list, all_goal, self.curr_a_list)
+
+
+    # # #by ray
+    # def do_forward_sim(self, states, goal, actions):
+
+    #     data_input = [states, actions, goal]
+    #     data_norm = [self.normalization_data.mean_curr_s, self.normalization_data.mean_diff_s, self.normalization_data.mean_curr_a, self.normalization_data.std_curr_s, self.normalization_data.std_diff_s, self.normalization_data.std_curr_a]
+    #     all_input_data = data_input + data_norm
+
+    #     dict_data = dict(list(zip(self.all_ph_graph, all_input_data)))
+    #     output = [self.curr_s_list, self.next_s_list, self.curr_a_list, self.Q_values]
+
+    #     curr_s_list, next_s_list, curr_a_list, curr_q_list = self.sess.run(output, feed_dict=dict_data)
+
+    #     # set_trace()
+    #     return curr_s_list, next_s_list, curr_a_list, curr_q_list
+
+
+
+    def do_forward_sim(self, states, goal, actions):
+
+        data_input = [states, goal, actions]
+        data_norm = [self.normalization_data.mean_x, self.normalization_data.mean_y, self.normalization_data.mean_z, self.normalization_data.std_x, self.normalization_data.std_y, self.normalization_data.std_z]
+        all_input_data = data_input + data_norm
+
+        dict_data = dict(list(zip(self.all_ph_graph, all_input_data)))
+        output = [self.s_list, self.Q_values]
+
+        # set_trace()
+        s_list, q_list = self.sess.run(output, feed_dict=dict_data)
+
+   
+        return s_list, q_list
 
 
 

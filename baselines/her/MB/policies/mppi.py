@@ -7,7 +7,7 @@ from ipdb import set_trace
 from baselines.her.MB.samplers import trajectory_sampler
 from baselines.her.MB.utils.helper_funcs import do_groundtruth_rollout
 from baselines.her.MB.utils.helper_funcs import turn_acs_into_acsK
-
+import time
 class MPPI(object):
 
     def __init__(self, env, dyn_models, ac_dim, params):
@@ -113,6 +113,7 @@ class MPPI(object):
             # if noise_factor_discount==0:
             #     return act_ddpg
 
+            t1 = time.time()
             if self.noise_type == 'gaussian':
                 eps = np.random.normal(loc=0, scale=1.0, size=(self.N, self.ac_dim)) * self.alpha * noise_factor_discount
             if self.noise_type == 'uniform':
@@ -122,8 +123,11 @@ class MPPI(object):
             first_acts = act_ddpg_tile + eps
             first_acts = np.clip(first_acts, -self.max_u, self.max_u)  #### actions are \in [-1,1]
 
+            t2 = time.time()
             resulting_states_list, resulting_Q_list = self.dyn_models.do_forward_sim(curr_state, goal, first_acts)
+            t3 = time.time()
             costs, mean_costs, std_costs = self.calculate_costs(resulting_states_list, resulting_Q_list, goal, evaluating, take_exploratory_actions)
+            t4 = time.time()
 
             # from ipdb import set_trace
             # set_trace()
@@ -143,6 +147,13 @@ class MPPI(object):
                     selected_action = first_acts[idx].mean(axis=0)
                     
                     selected_action = np.tile(selected_action,(1,1))
+            
+            # print("t1-t2: {:0.4f} s".format(t2 - t1))
+            # print("t2-t3: {:0.4f} s".format(t3 - t2))
+            # print("t3-t4: {:0.4f} s".format(t4 - t3))
+            # # print("t4-t: {:0.4f} s".format(time.time() - t4))
+            # print("total time *******: {:0.4f} s".format(time.time() - t1))
+
             return selected_action
 
     def reward_fun(self, obs, next_obs, goal):

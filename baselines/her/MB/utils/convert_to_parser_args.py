@@ -51,6 +51,9 @@ def convert_to_parser_args(args_source=sys.argv[1:]):
     parser.add_argument('--rollouts_noise_actions', action="store_true")
     parser.add_argument('--rollouts_document_noised_actions', action="store_true")
 
+    parser.add_argument('--s_dim', type=int, default=2)
+    parser.add_argument('--a_dim', type=int, default=2)
+
     ###########################
     ### random data collection
     ###########################

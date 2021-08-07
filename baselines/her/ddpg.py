@@ -195,6 +195,7 @@ class DDPG(object):
         o = tf.clip_by_value(o, -self.clip_obs, self.clip_obs)
         g = tf.clip_by_value(g, -self.clip_obs, self.clip_obs)   
 
+        # set_trace()
 
         o = tf.reshape(o, [-1, self.dimo])
         g = tf.reshape(g, [-1, self.dimg])
@@ -204,7 +205,6 @@ class DDPG(object):
         else:           #### get Q value, need u
             action = tf.reshape(u, [-1, self.dimu])
     
-        # set_trace()
 
         #### two ways
         # batch_tf = OrderedDict([ (key, val) for key, val in zip(['o', 'g', 'u'], [o, g, action]) ])

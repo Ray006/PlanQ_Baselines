@@ -24,6 +24,7 @@ def convert_to_parser_args(args_source=sys.argv[1:]):
     parser.add_argument('--make_training_dataset_noisy', action="store_true")
 
     parser.add_argument('--s_dim', type=int, default=2)
+    parser.add_argument('--g_dim', type=int, default=2)
     parser.add_argument('--a_dim', type=int, default=2)
 
     parser.add_argument('--rand_policy_sample_velocities', action="store_true")

@@ -326,7 +326,7 @@ class Dyn_Model:
 
         '''  current state and action placeholders '''
         self.inputs_curr_s = tf.placeholder( self.tf_datatype, shape=[1, self.params.s_dim], name='curr_s')
-        self.inputs_goal = tf.placeholder( self.tf_datatype, shape=[1, 3], name='goal')
+        self.inputs_goal = tf.placeholder( self.tf_datatype, shape=[1, self.params.g_dim], name='goal')
         if self.mppi_only:
             self.inputs_curr_a = tf.placeholder( self.tf_datatype, shape=[self.N, self.H, self.params.a_dim], name='curr_a')
         else:

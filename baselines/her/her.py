@@ -189,6 +189,7 @@ def learn(*, network, env, total_timesteps,
     if params['use_planner']:
         logger.warn('Use_planner: ' + str(params['use_planner']))
         logger.warn('horizon: ' + str(MB.args.horizon))
+        logger.warn('num_control_samples: ' + str(MB.args.num_control_samples))
 
         if MB.args.mppi_only:  
             logger.warn('Use_mppi_planner_only: ' + str(MB.args.mppi_only))

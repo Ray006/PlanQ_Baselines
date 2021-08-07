@@ -159,10 +159,16 @@ class MPPI(object):
         'HandManipulateBlockRotateZ-v0':next_obs[:,:,-7:],'HandManipulateEggRotate-v0':next_obs[:,:,-7:],'HandManipulatePenRotate-v0':next_obs[:,:,-7:]}  #-7:
 
         assert self.env.spec.id in available_envs.keys(),  'Oops! The environment tested is not available!'
+        
 
         achieved_goal = available_envs[self.env.spec.id]
+
+        # set_trace()
         # assume that the reward function is known.
-        all_r = self.env.envs[0].compute_reward(achieved_goal, goal, 'NoNeed')
+        if self.env.spec.id[:5] != 'Fetch': #### if it's hand env 
+            all_r = np.concatenate([ self.env.envs[0].compute_reward(ag, g, 'NoNeed').reshape(1,-1) for ag, g in zip(achieved_goal, goal) ])
+        else: #### if it's Fetch env 
+            all_r = self.env.envs[0].compute_reward(achieved_goal, goal, 'NoNeed')
 
         return all_r
 

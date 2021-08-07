@@ -33,6 +33,7 @@ from baselines.her.MB.policies.mppi import MPPI
 SCRIPT_DIR = os.path.dirname(__file__)
 
 
+#### H10N500a0.3b1e6
 class MB_class:
     def __init__(self, env, buffer_size, dims, policy):
         self.buffer_size = buffer_size
@@ -54,7 +55,7 @@ class MB_class:
                     ##########################
                     'horizon': [10],
                     'num_control_samples': [500],
-                    'alpha': [0.5],        ### noise factor
+                    'alpha': [0.3],        ### noise factor
 
                     'use_exponential': [True],
                     # 'use_exponential': [False],
@@ -73,6 +74,7 @@ class MB_class:
                   }
         
         para_dict['s_dim'] = [dims['o']]
+        para_dict['g_dim'] = [dims['g']]
         para_dict['a_dim'] = [dims['u']]
 
         self.para = para_dict

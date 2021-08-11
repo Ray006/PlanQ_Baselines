@@ -51,6 +51,8 @@ _game_envs['retro'] = {
 
 
 def train(args, extra_args):
+    # from ipdb import set_trace
+    # set_trace()
     env_type, env_id = get_env_type(args)
     print('env_type: {}'.format(env_type))
 
@@ -60,6 +62,7 @@ def train(args, extra_args):
     learn = get_learn_function(args.alg)
     alg_kwargs = get_learn_function_defaults(args.alg, env_type)
     alg_kwargs.update(extra_args)
+
 
     env = build_env(args)
     if args.save_video_interval != 0:
@@ -121,10 +124,16 @@ def build_env(args):
         config.gpu_options.allow_growth = True
         get_session(config=config)
 
+
+        # from ipdb import set_trace
+        # set_trace()
+
         flatten_dict_observations = alg not in {'her'}
         env = make_vec_env(env_id, env_type, args.num_env or 1, seed, reward_scale=args.reward_scale, flatten_dict_observations=flatten_dict_observations)
 
-        if env_type == 'mujoco':
+        
+        # if env_type == 'mujoco':
+        if env_type == 'mujoco' and env_id != 'Reacher-v2':
             env = VecNormalize(env, use_tf=True)
 
     return env
@@ -132,6 +141,11 @@ def build_env(args):
 
 def get_env_type(args):
     env_id = args.env
+        
+    # from ipdb import set_trace
+    # set_trace()
+    if env_id == 'dclaw_turn-v0':   ##### if it's dclaw, skip here
+        return 'dclaw', env_id
 
     if args.env_type is not None:
         return args.env_type, env_id

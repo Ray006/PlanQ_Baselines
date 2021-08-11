@@ -36,6 +36,8 @@ def train(*, policy, rollout_worker, evaluator,
 
     if policy.bc_loss == 1: policy.init_demo_buffer(demo_file) #initialize demo buffer if training with demonstrations
 
+    num_data_past = 0
+    num_data_curr = 0
     test_success_rate_for_noise_factor = 0
     # num_timesteps = n_epochs * n_cycles * rollout_length * number of rollout workers
     for epoch in range(n_epochs):
@@ -43,15 +45,21 @@ def train(*, policy, rollout_worker, evaluator,
         for _ in range(n_cycles):
             episode = rollout_worker.generate_rollouts(epoch,test_success_rate_for_noise_factor)
             policy.store_episode(episode)
-            if MB != None: MB.store_rollout(episode)
+            if MB != None: 
+                MB.store_rollout(episode)
+                num_data_curr = MB.num_data
             for _ in range(n_batches):
                 policy.train()
             policy.update_target_net()
             
             # set_trace()
 
-            # if (MB != None) and (not rollout_worker.abandon_planner): MB.run_job()
-        if (MB != None) and (not rollout_worker.abandon_planner): MB.run_job()
+            if (MB != None) and (not rollout_worker.abandon_planner): 
+                if num_data_curr - num_data_past >= 1000:
+                    MB.run_job()  #### train once per epoch
+                    num_data_past = num_data_curr
+
+        # if (MB != None) and (not rollout_worker.abandon_planner): MB.run_job()   #### train once per epoch
 
         # test
         evaluator.clear_history()
@@ -105,6 +113,10 @@ def learn(*, network, env, total_timesteps,
     save_path=None,
     **kwargs
 ):
+
+
+    # from ipdb import set_trace
+    # set_trace()
 
     override_params = override_params or {}
     if MPI is not None:

@@ -63,6 +63,7 @@ def make_env(env_id, env_type, mpi_rank=0, subrank=0, seed=None, reward_scale=1.
     if initializer is not None:
         initializer(mpi_rank=mpi_rank, subrank=subrank)
 
+
     wrapper_kwargs = wrapper_kwargs or {}
     env_kwargs = env_kwargs or {}
     if ':' in env_id:
@@ -78,7 +79,22 @@ def make_env(env_id, env_type, mpi_rank=0, subrank=0, seed=None, reward_scale=1.
         gamestate = gamestate or retro.State.DEFAULT
         env = retro_wrappers.make_retro(game=env_id, max_episode_steps=10000, use_restricted_actions=retro.Actions.DISCRETE, state=gamestate)
     else:
-        env = gym.make(env_id, **env_kwargs)
+        
+        ### by ray
+        # if env_id == 'pddm_dclaw_turn-v0':
+        #     import dclaw_for_planQ.envs
+        #     # from dclaw_for_planQ.envs.gym_env import GymEnv
+        #     # from dclaw_for_planQ.envs.mb_env import MBEnvWrapper
+        #     # from ipdb import set_trace
+        #     # set_trace()
+        #     # env = MBEnvWrapper(GymEnv(env_id))
+        #     # env = GymEnv(env_id)
+        #     env = gym.make(env_id)
+        if env_id == 'dclaw_turn-v0':
+            import dclaw_for_planQ.envs
+            env = gym.make(env_id)
+        else:
+            env = gym.make(env_id, **env_kwargs)
 
     if flatten_dict_observations and isinstance(env.observation_space, gym.spaces.Dict):
         env = FlattenObservation(env)

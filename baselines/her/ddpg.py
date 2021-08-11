@@ -308,6 +308,8 @@ class DDPG(object):
             episode_batch['o_2'] = episode_batch['o'][:, 1:, :]
             episode_batch['ag_2'] = episode_batch['ag'][:, 1:, :]
             num_normalizing_transitions = transitions_in_episode_batch(episode_batch)
+            
+            # set_trace()
             transitions = self.sample_transitions(episode_batch, num_normalizing_transitions)
 
             o, g, ag = transitions['o'], transitions['g'], transitions['ag']

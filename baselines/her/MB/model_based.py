@@ -32,6 +32,10 @@ from baselines.her.MB.policies.mppi import MPPI
 
 SCRIPT_DIR = os.path.dirname(__file__)
 
+# def get_num_data(rollouts):
+#     num_data = 0
+#     for rollout in rollouts:    num_data += rollout.a.shape[0]
+#     return num_data
 
 #### H10N500a0.3b1e6
 class MB_class:
@@ -53,7 +57,7 @@ class MB_class:
                     ##########################
                     ##### controller
                     ##########################
-                    'horizon': [10],
+                    'horizon': [5],
                     'num_control_samples': [500],
                     'alpha': [0.3],        ### noise factor
 
@@ -104,6 +108,8 @@ class MB_class:
         self.planner = MPPI(env, self.dyn_models, a_dim, params=self.args)
         self.model_was_learned = False
 
+        self.env = env
+
 
     def store_rollout(self, episode):
 
@@ -112,10 +118,10 @@ class MB_class:
         
         num_rollouts = len(self.rollouts)
         lenth_each_rollout = self.rollouts[0].actions.shape[0]
-        num_data = num_rollouts * lenth_each_rollout
+
+        self.num_data = num_rollouts * lenth_each_rollout
         
-        if num_data > self.buffer_size: 
-            # set_trace()
+        if self.num_data > self.buffer_size: 
             self.rollouts.pop(0)
             # print('d')
 
@@ -126,6 +132,22 @@ class MB_class:
         action_dim = self.rollouts[0].actions.shape[-1]
         return state_dim, action_dim
 
+    # def get_rollout(self):
+               
+    #     rollouts_train = []
+    #     rollouts_val = []
+
+    #     num_mpc_rollouts = len(self.rollouts)
+    #     shuffle(self.rollouts)
+
+    #     for i,rollout in enumerate(self.rollouts):
+    #         if i<int(num_mpc_rollouts * 0.9):
+    #             rollouts_train.append(rollout)
+    #         else:
+    #             rollouts_val.append(rollout)
+
+    #     return rollouts_train, rollouts_val
+
     def get_rollout(self):
                
         rollouts_train = []
@@ -135,10 +157,13 @@ class MB_class:
         shuffle(self.rollouts)
 
         for i,rollout in enumerate(self.rollouts):
-            if i<int(num_mpc_rollouts * 0.9):
-                rollouts_train.append(rollout)
-            else:
-                rollouts_val.append(rollout)
+            if i<int(num_mpc_rollouts * 0.9): rollouts_train.append(rollout)
+            else: rollouts_val.append(rollout)
+
+        if rollouts_val == []:
+            rollout=rollouts_train[0]
+            rollouts_train.pop[0]
+            rollouts_val.append(rollout)
 
         return rollouts_train, rollouts_val
 

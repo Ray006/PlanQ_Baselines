@@ -176,8 +176,7 @@ class Dyn_Model:
                     all_indices[batch * self.batchsize:(batch + 1) *
                                 self.batchsize]]  #[bs x K x dim]
                 data_outputs_batch = data_outputs[all_indices[
-                    batch * self.batchsize:(batch + 1) * self.
-                    batchsize]]  #[bs x dim]
+                    batch * self.batchsize:(batch + 1) * self.batchsize]]  #[bs x dim]
 
                 #one iteration of feedforward training
                 this_dataX = np.tile(data_inputs_batch,
@@ -196,6 +195,8 @@ class Dyn_Model:
                 training_loss_list.append(loss)
                 sum_training_loss += loss
                 num_training_batches += 1
+            
+            # set_trace()
 
             mean_training_loss = sum_training_loss / num_training_batches
 

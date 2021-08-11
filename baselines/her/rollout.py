@@ -4,7 +4,7 @@ import numpy as np
 import pickle
 
 from baselines.her.util import convert_episode_to_batch_major, store_args
-
+from ipdb import set_trace
 
 class RolloutWorker:
 
@@ -46,10 +46,13 @@ class RolloutWorker:
         self.abandon_planner = False
 
     def reset_all_rollouts(self):
+        # from ipdb import set_trace
+        # set_trace()
         self.obs_dict = self.venv.reset()
         self.initial_o = self.obs_dict['observation']
         self.initial_ag = self.obs_dict['achieved_goal']
         self.g = self.obs_dict['desired_goal']
+
 
     def generate_rollouts(self, epoch, test_success_rate_for_noise_factor):
         """Performs `rollout_batch_size` rollouts in parallel for time horizon `T` with the current
@@ -92,8 +95,6 @@ class RolloutWorker:
             ag_new = np.empty((self.rollout_batch_size, self.dims['g']))
             success = np.zeros(self.rollout_batch_size)
 
-            # from ipdb import set_trace
-            # set_trace()
 
 
 
@@ -123,12 +124,23 @@ class RolloutWorker:
                         # u = self.mb.planner.get_action(o, self.g, u)
                         u = self.mb.planner.get_action(o, self.g, u, evaluating=False, take_exploratory_actions=False, noise_factor_discount=noise_factor_discount)
 
+            # if t>=498:
+            # # if t>=48:
+            #     # self.venv.envs[0].env.needs_reset
+            #     
+            # set_trace()
+
+            
 
             # compute new states and observations
             obs_dict_new, _, done, info = self.venv.step(u)
             o_new = obs_dict_new['observation']
             ag_new = obs_dict_new['achieved_goal']
             success = np.array([i.get('is_success', 0.0) for i in info])
+
+
+            # if (epoch ==1 or epoch >10) and self.exploit==True :  self.venv.render()
+            # if test_success_rate_for_noise_factor>=0.9 and self.exploit==True :  self.venv.render()
 
             if any(done):
                 # here we assume all environments are done is ~same number of steps, so we terminate rollouts whenever any of the envs returns done
@@ -163,6 +175,7 @@ class RolloutWorker:
         for key, value in zip(self.info_keys, info_values):
             episode['info_{}'.format(key)] = value
 
+        # set_trace()
         # stats
         successful = np.array(successes)[-1, :]
         assert successful.shape == (self.rollout_batch_size,)

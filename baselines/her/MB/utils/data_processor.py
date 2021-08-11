@@ -63,7 +63,9 @@ class DataProcessor:
         self.update_model_normalization(model)
 
     def preprocess_data(self, dataset):
-
+        
+        # from ipdb import set_trace
+        # set_trace() 
         #make data mean0/std1
         if dataset.dataX.shape[0]>0:
             x_preprocessed = (dataset.dataX - self.normalization_data.mean_x

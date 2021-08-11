@@ -153,9 +153,21 @@ class MPPI(object):
 
             return selected_action
 
+
+    # def reward_fun_reacher(self, obs, next_obs, goal):
+    #     ag = np.concatenate((next_obs[:,:,-2:], goal[:,:,2:]),-1)
+    #     all_r = self.env.envs[0].compute_reward(ag, goal, 'NoNeed')
+    #     return all_r
+
     def reward_fun(self, obs, next_obs, goal):
+
+        # if self.env.spec.id == 'Reacher-v2':
+        #     return self.reward_fun_reacher(obs, next_obs, goal)
+
+
         available_envs={'FetchReach-v1':next_obs[:,:,0:3], 'FetchPush-v1':next_obs[:,:,3:6],'FetchSlide-v1':next_obs[:,:,3:6],'FetchPickAndPlace-v1':next_obs[:,:,3:6],  #3:6
-        # 'HandReach-v0':next_obs[:,:,-15:], #-15:
+        'Reacher-v2':next_obs[:,:,-2:], #-15:
+        'dclaw_turn-v0':next_obs[:,:,-2:-1], #-15:
         'HandManipulateBlockRotateZ-v0':next_obs[:,:,-7:],'HandManipulateEggRotate-v0':next_obs[:,:,-7:],'HandManipulatePenRotate-v0':next_obs[:,:,-7:]}  #-7:
 
         assert self.env.spec.id in available_envs.keys(),  'Oops! The environment tested is not available!'
@@ -183,6 +195,7 @@ class MPPI(object):
         costs = np.zeros((self.N * self.ensemble_size,))
         gamma = 0.98
 
+        # set_trace() 
         for t in range(self.H):
             q_val = resulting_Q[t]
             step_rews = all_r[t] 

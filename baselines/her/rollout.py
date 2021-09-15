@@ -98,7 +98,7 @@ class RolloutWorker:
 
 
 
-            # ######## noise factor discount
+            #################### For PlanQ-P, noise can be weaken until 0 i.e. abandon the planner (begin) ########################################################
             # if self.n_epoch==0:
             #     noise_factor_discount = 1
             #     if test_success_rate_for_noise_factor>=0.9:
@@ -113,25 +113,16 @@ class RolloutWorker:
 
             #### NO discount
             noise_factor_discount = 1
+            #################### For PlanQ-P, noise can be weaken until 0 i.e. abandon the planner (end) ########################################################
 
             if not self.abandon_planner:
-
                 ##### here, use planner v1
-                ### exploration by random action in ddpg
                 if self.mb != None:
                     if self.mb.model_was_learned == True and exp!=1:
-                        # print("inininin")
                         # u = self.mb.planner.get_action(o, self.g, u)
                         u = self.mb.planner.get_action(o, self.g, u, evaluating=False, take_exploratory_actions=False, noise_factor_discount=noise_factor_discount)
 
-            # if t>=498:
-            # # if t>=48:
-            #     # self.venv.envs[0].env.needs_reset
-            #     
-            # set_trace()
-
-            
-
+  
             # compute new states and observations
             obs_dict_new, _, done, info = self.venv.step(u)
             o_new = obs_dict_new['observation']

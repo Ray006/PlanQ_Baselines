@@ -26,7 +26,6 @@ class MPPI(object):
         self.beta = params.beta
         self.alpha = params.alpha   ## noise factor
 
-        # self.mppi_only = False
         self.mppi_only = params.mppi_only
         self.mppi_mean = np.zeros((self.H, self.ac_dim))  #start mean at 0
         self.sample_velocity = params.rand_policy_sample_velocities
@@ -35,14 +34,12 @@ class MPPI(object):
         self.mppi_kappa = params.mppi_kappa
         
         self.max_u = 1
-        # set_trace()
 
     ###### modified from pddm
     def mppi_update(self, scores, all_samples):
 
         if self.mppi_only:
 
-            # print('use mppi planner only instead of ddpg policy')
             S = np.exp(self.mppi_kappa * (scores - np.max(scores)))  # [N,]
             denom = np.sum(S) + 1e-10
 
@@ -68,7 +65,6 @@ class MPPI(object):
 
         # set_trace()
         if self.mppi_only:
-            t1 = time.time()
             past_action = self.mppi_mean[0].copy()
             self.mppi_mean[:-1] = self.mppi_mean[1:]
 
@@ -108,7 +104,6 @@ class MPPI(object):
 
             selected_action = np.tile(selected_action,(1,1))
 
-            # print("total time *******: {:0.4f} s".format(time.time() - t1))
 
             return selected_action
         else:
@@ -116,8 +111,6 @@ class MPPI(object):
         
             # if noise_factor_discount==0:
             #     return act_ddpg
-
-            t1 = time.time()
             if self.noise_type == 'gaussian':
                 eps = np.random.normal(loc=0, scale=1.0, size=(self.N, self.ac_dim)) * self.alpha * noise_factor_discount
             if self.noise_type == 'uniform':
@@ -149,29 +142,15 @@ class MPPI(object):
                     
                     selected_action = np.tile(selected_action,(1,1))
 
-            # print("total time *******: {:0.4f} s".format(time.time() - t1))
-
             return selected_action
-
-
-    # def reward_fun_reacher(self, obs, next_obs, goal):
-    #     ag = np.concatenate((next_obs[:,:,-2:], goal[:,:,2:]),-1)
-    #     all_r = self.env.envs[0].compute_reward(ag, goal, 'NoNeed')
-    #     return all_r
 
     def reward_fun(self, obs, next_obs, goal):
 
-        # if self.env.spec.id == 'Reacher-v2':
-        #     return self.reward_fun_reacher(obs, next_obs, goal)
-
-
-        available_envs={'FetchReach-v1':next_obs[:,:,0:3], 'FetchPush-v1':next_obs[:,:,3:6],'FetchSlide-v1':next_obs[:,:,3:6],'FetchPickAndPlace-v1':next_obs[:,:,3:6],  #3:6
-        'Reacher-v2':next_obs[:,:,-2:], #-15:
+        available_envs={'FetchReach-v1':next_obs[:,:,0:3], 'FetchPush-v1':next_obs[:,:,3:6],'FetchPickAndPlace-v1':next_obs[:,:,3:6],  #3:6
         'dclaw_turn-v0':next_obs[:,:,-2:-1], #-15:
-        'HandManipulateBlockRotateZ-v0':next_obs[:,:,-7:],'HandManipulateEggRotate-v0':next_obs[:,:,-7:],'HandManipulatePenRotate-v0':next_obs[:,:,-7:]}  #-7:
+        'HandManipulateBlockRotateZ-v0':next_obs[:,:,-7:]}  #-7:
 
         assert self.env.spec.id in available_envs.keys(),  'Oops! The environment tested is not available!'
-        
 
         achieved_goal = available_envs[self.env.spec.id]
 
@@ -200,11 +179,11 @@ class MPPI(object):
             q_val = resulting_Q[t]
             step_rews = all_r[t] 
 
+            #################### select return forms (begin) ########################################################
             # costs -= pow(gamma,t) * step_rews  ### vanilla PDDM
+            # costs -= (t!=(self.H-1))*pow(gamma,t) * step_rews + (t==(self.H-1))*pow(gamma,t) *q_val[:,0] ### n-step return
             costs -= (self.H-t-1) * pow(gamma,t) * step_rews + pow(gamma,t) * q_val[:,0]   ### ours 
-
-        # set_trace() 
-        # costs1
+            #################### select return forms (begin) ########################################################
 
         scores_reshape = costs.reshape(self.ensemble_size, self.N)
         new_costs = np.swapaxes(scores_reshape, 0,1)    

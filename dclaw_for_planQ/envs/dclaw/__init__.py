@@ -18,6 +18,5 @@ from gym.envs.registration import register
 register(
     id='dclaw_turn-v0',
     entry_point='dclaw_for_planQ.envs.dclaw.dclaw_turn_env:DClawTurnEnv',
-    max_episode_steps=50,
-#    max_episode_steps=500,
+    max_episode_steps=100,
 )

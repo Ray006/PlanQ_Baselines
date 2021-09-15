@@ -40,15 +40,18 @@ DEFAULT_PARAMS = {
     'random_eps': 0.3,  # percentage of time a random action is taken
     'noise_eps': 0.2,  # std of gaussian noise added to not-completely-random actions as a percentage of max_u
     
-    
-    # HER
-    'replay_strategy': 'future',  # supported modes: future, none
-    # 'replay_strategy': 'none',  # regular ddpg
+
+    ## HER
     'replay_k': 4,  # number of additional goals used for replay, only used if off_policy_data=future
+
+
+    #################### 1.DDPG with or without HER; 2.Use PlanQ or not. (begin) ########################################################
+    'replay_strategy': 'future',  # Use HER technique.  supported modes: future, none
+    # 'replay_strategy': 'none',  # Regular ddpg, no HER.
     
-    # planner
-    'use_planner': True,
-    # 'use_planner': False,   
+    'use_planner': True,     #### use planQ
+    # 'use_planner': False,   #### not use planQ
+    #################### 1.DDPG with or without HER; 2.Use PlanQ or not. (end) ########################################################
     
     
     
@@ -198,9 +201,6 @@ def configure_dims(params):
     env.reset()
     obs, _, _, info = env.step(env.action_space.sample())
     
-    # from ipdb import set_trace
-    # set_trace()
-
     dims = {
         'o': obs['observation'].shape[0],
         'u': env.action_space.shape[0],

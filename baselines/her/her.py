@@ -36,37 +36,32 @@ def train(*, policy, rollout_worker, evaluator,
 
     if policy.bc_loss == 1: policy.init_demo_buffer(demo_file) #initialize demo buffer if training with demonstrations
 
-    num_data_past = 0
     num_data_curr = 0
     test_success_rate_for_noise_factor = 0
-    # num_timesteps = n_epochs * n_cycles * rollout_length * number of rollout workers
-    for epoch in range(n_epochs):
+    for epoch in range(n_epochs):  ### num_timesteps = n_epochs * n_cycles * rollout_length * number of rollout workers
         rollout_worker.clear_history()
         for _ in range(n_cycles):
             episode = rollout_worker.generate_rollouts(epoch,test_success_rate_for_noise_factor)
             policy.store_episode(episode)
+            #################### store data for dynamics models (begin) ########################################################
             if MB != None: 
                 MB.store_rollout(episode)
                 num_data_curr = MB.num_data
+            #################### store data for dynamics models (end) ########################################################
             for _ in range(n_batches):
                 policy.train()
             policy.update_target_net()
             
-            # set_trace()
+        if (MB != None) and (not rollout_worker.abandon_planner): MB.run_job()   #### train dynamics models once per epoch
 
-            if (MB != None) and (not rollout_worker.abandon_planner): 
-                if num_data_curr - num_data_past >= 1000:
-                    MB.run_job()  #### train once per epoch
-                    num_data_past = num_data_curr
 
-        # if (MB != None) and (not rollout_worker.abandon_planner): MB.run_job()   #### train once per epoch
-
-        # test
+        ####### test_success_rate_for_noise_factor ############# can be used to weaken the noise (begin) ########################################################
         evaluator.clear_history()
         for _ in range(n_test_rollouts):
             evaluator.generate_rollouts(epoch,test_success_rate_for_noise_factor)
-
         test_success_rate_for_noise_factor = evaluator.logs('test')[0][1]
+        ####### test_success_rate_for_noise_factor ############# can be used to weaken the noise (end) ########################################################
+
         # record logs
         logger.record_tabular('epoch', epoch)
         for key, val in evaluator.logs('test'):
@@ -114,10 +109,6 @@ def learn(*, network, env, total_timesteps,
     **kwargs
 ):
 
-
-    # from ipdb import set_trace
-    # set_trace()
-
     override_params = override_params or {}
     if MPI is not None:
         rank = MPI.COMM_WORLD.Get_rank()
@@ -158,33 +149,21 @@ def learn(*, network, env, total_timesteps,
         logger.warn('****************')
         logger.warn()
 
-    # from ipdb import set_trace
-    # set_trace()
-
     dims = config.configure_dims(params)
     policy = config.configure_ddpg(dims=dims, params=params, clip_return=clip_return)
 
-
-
-
-
-
+    ###################################### dynamics model (begin) ########################################################
     use_planner = params['use_planner']
     if use_planner:
         MB = MB_class(env=env, buffer_size=1000000, dims=dims, policy=policy)
-        
         for key in sorted(MB.para.keys()):
             logger.info('{}: {}'.format(key, MB.para[key]))
     else:
         MB = None
+    ###################################### dynamics model (end) ########################################################
 
-
-
-    # from ipdb import set_trace
-    # set_trace()
-
-
-
+    
+    ###################################### print info (begin) ########################################################
     logger.warn()
     logger.warn()
     logger.warn()
@@ -216,19 +195,13 @@ def learn(*, network, env, total_timesteps,
                 logger.warn('beta: ' + str(MB.args.beta) )
             else:
                 logger.warn('Use_exponential: ' + str(MB.args.use_exponential) )
-
     else:
         logger.warn('Use_planner: ' + str(params['use_planner']) )
     logger.warn()
-
-    # from ipdb import set_trace
-    # set_trace()
-    
-        
+    ###################################### print info (end) ########################################################
 
     if load_path is not None:
         tf_util.load_variables(load_path)
-
     rollout_params = {
         'exploit': False,
         # 'exploit': True,  ### no exploration for all ddpg actions
@@ -237,7 +210,6 @@ def learn(*, network, env, total_timesteps,
         'compute_Q': False,
         'T': params['T'],
     }
-
     eval_params = {
         'exploit': True,
         'use_target_net': params['test_with_polyak'],
@@ -252,8 +224,11 @@ def learn(*, network, env, total_timesteps,
 
     eval_env = eval_env or env
 
+
+    ###################################### both trainning and testing use dynamics models (begin) ########################################################
     rollout_worker = RolloutWorker(env, policy, dims, logger, monitor=True, mb=MB, **rollout_params)
     evaluator = RolloutWorker(eval_env, policy, dims, logger, mb=MB, **eval_params)
+    ###################################### both trainning and testing use dynamics models (end) ########################################################
 
     n_cycles = params['n_cycles']
     n_epochs = total_timesteps // n_cycles // rollout_worker.T // rollout_worker.rollout_batch_size

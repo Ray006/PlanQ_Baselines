@@ -32,10 +32,6 @@ from baselines.her.MB.policies.mppi import MPPI
 
 SCRIPT_DIR = os.path.dirname(__file__)
 
-# def get_num_data(rollouts):
-#     num_data = 0
-#     for rollout in rollouts:    num_data += rollout.a.shape[0]
-#     return num_data
 
 #### H10N500a0.3b1e6
 class MB_class:
@@ -62,17 +58,16 @@ class MB_class:
                     'alpha': [0.3],        ### noise factor
 
                     'use_exponential': [True],
-                    # 'use_exponential': [False],
                     'noise_type': ['gaussian'],
-                    # 'noise_type': ['uniform'],
                     'beta': [1000000],        ### exponentially weighted factor, like the one mppi-kappa
-                    # 'beta': [20],        ### exponentially weighted factor, like the one mppi-kappa
 
-                    # 'mppi_only': [True],        ### use mppi planner or not
-                    'mppi_only': [False],        ### use mppi planner or not
+                    #################### PlanQ-S or PlanQ-P  (begin) ########################################################
+                    'mppi_only': [True],        ### sample actions from planner, PlanQ-S == PDDM + PlanQ
+                    # 'mppi_only': [False],        ### sample actions from policy, PlanQ-P == DDPG/HER + PlanQ
+                    #################### PlanQ-S or PlanQ-P  (begin) ########################################################
+
                     'rand_policy_sample_velocities': [False],
                     'mppi_kappa': [10],     ### for mppi planner
-                    # 'mppi_kappa': [50],     ### hand for mppi planner
                     'mppi_beta': [0.6],
                     'mppi_mag_noise': [0.8],
                   }
@@ -131,22 +126,6 @@ class MB_class:
         state_dim = self.rollouts[0].states.shape[-1]
         action_dim = self.rollouts[0].actions.shape[-1]
         return state_dim, action_dim
-
-    # def get_rollout(self):
-               
-    #     rollouts_train = []
-    #     rollouts_val = []
-
-    #     num_mpc_rollouts = len(self.rollouts)
-    #     shuffle(self.rollouts)
-
-    #     for i,rollout in enumerate(self.rollouts):
-    #         if i<int(num_mpc_rollouts * 0.9):
-    #             rollouts_train.append(rollout)
-    #         else:
-    #             rollouts_val.append(rollout)
-
-    #     return rollouts_train, rollouts_val
 
     def get_rollout(self):
                
